@@ -27,7 +27,7 @@ const props = defineProps({
 });
 
 function formatMetric(val) {
-  if (val === undefined || val === null) return 'N/A';
+  if (val === undefined || val === null) return '无数据';
   if (props.unit === '') return val.toFixed(3);
   return val.toFixed(0);
 }
@@ -40,10 +40,10 @@ function getMetricColor() {
 }
 
 function getStatus() {
-  if (props.metric === undefined || props.metric === null) return 'No data';
-  if (props.metric <= props.good) return '✓ Good';
-  if (props.metric <= props.poor) return '⚠ Needs improvement';
-  return '✗ Poor';
+  if (props.metric === undefined || props.metric === null) return '无数据';
+  if (props.metric <= props.good) return '✓ 良好';
+  if (props.metric <= props.poor) return '⚠ 需要改进';
+  return '✗ 较差';
 }
 
 function getStatusColor() {

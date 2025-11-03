@@ -16,7 +16,7 @@ router.post("/", async (req, res) => {
     if (!url || typeof url !== "string") {
       console.error("Invalid URL:", url, "Type:", typeof url);
       return res.status(400).json({
-        error: "URL is required and must be a string",
+        error: "URL 是必需的且必须是字符串",
         received: req.body,
       });
     }
@@ -25,7 +25,7 @@ router.post("/", async (req, res) => {
     try {
       new URL(url);
     } catch {
-      return res.status(400).json({ error: "Invalid URL format" });
+      return res.status(400).json({ error: "无效的 URL 格式" });
     }
 
     console.log(`🔍 Analyzing: ${url}`);
@@ -59,7 +59,7 @@ router.post("/", async (req, res) => {
   } catch (error) {
     console.error("Analysis error:", error);
     res.status(500).json({
-      error: "Failed to analyze website",
+      error: "分析网站失败",
       message: error.message,
     });
   }
