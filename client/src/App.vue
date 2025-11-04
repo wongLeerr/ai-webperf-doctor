@@ -7,7 +7,7 @@
           🏥 AI 网页性能诊断工具
         </h1>
         <p class="text-xl text-gray-600">
-          基于 Lighthouse 和 GPT-4 的 AI 网页性能分析工具
+          基于 Lighthouse 和 DDAI 的智能网页性能分析平台
         </p>
       </header>
 
@@ -18,14 +18,14 @@
             v-model="url"
             type="text"
             placeholder="请输入网站 URL（例如：https://example.com）"
-            class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+            class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
             @keyup.enter="analyze"
             :disabled="loading"
           />
           <button
             @click="analyze"
             :disabled="loading || !url"
-            class="px-8 py-3 bg-primary text-white rounded-lg hover:bg-primary-600 disabled:bg-gray-400 disabled:cursor-not-allowed font-semibold transition-colors"
+            class="px-8 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-semibold transition-colors"
           >
             {{ loading ? "分析中..." : "开始分析" }}
           </button>
@@ -35,35 +35,61 @@
       <!-- Loading State -->
       <div v-if="loading" class="text-center py-12">
         <div
-          class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary"
+          class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600"
         ></div>
         <p class="mt-4 text-gray-600">正在分析网站性能...</p>
       </div>
 
       <!-- Results -->
       <div v-if="results && !loading" class="space-y-6">
-        <!-- Performance Score -->
+        <!-- Performance Score Card -->
         <div class="bg-white rounded-lg shadow-lg p-6">
           <h2 class="text-2xl font-bold mb-4">性能评分</h2>
-          <div class="text-center">
-            <div class="inline-block relative">
-              <div
-                class="text-6xl font-bold"
-                :class="getScoreColor(results.lighthouse.score)"
-              >
-                {{ results.lighthouse.score }}
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="text-center">
+              <div class="text-3xl font-bold" :class="getScoreColor(results.lighthouse.scores?.performance || results.lighthouse.score)">
+                {{ results.lighthouse.scores?.performance || results.lighthouse.score }}
               </div>
-              <div class="text-gray-500">/ 100</div>
+              <div class="text-gray-500 text-sm">性能</div>
+            </div>
+            <div v-if="results.lighthouse.scores?.accessibility" class="text-center">
+              <div class="text-3xl font-bold text-blue-600">
+                {{ results.lighthouse.scores.accessibility }}
+              </div>
+              <div class="text-gray-500 text-sm">可访问性</div>
+            </div>
+            <div v-if="results.lighthouse.scores?.['best-practices']" class="text-center">
+              <div class="text-3xl font-bold text-purple-600">
+                {{ results.lighthouse.scores['best-practices'] }}
+              </div>
+              <div class="text-gray-500 text-sm">最佳实践</div>
+            </div>
+            <div v-if="results.lighthouse.scores?.seo" class="text-center">
+              <div class="text-3xl font-bold text-green-600">
+                {{ results.lighthouse.scores.seo }}
+              </div>
+              <div class="text-gray-500 text-sm">SEO</div>
             </div>
           </div>
         </div>
 
-        <!-- Metrics Chart -->
+        <!-- AI Analysis Summary -->
         <div class="bg-white rounded-lg shadow-lg p-6">
-          <h2 class="text-2xl font-bold mb-4">核心 Web 指标</h2>
-          <div class="h-64">
-            <v-chart :option="chartOption" class="w-full h-full" />
+          <h2 class="text-2xl font-bold mb-4">🤖 AI 分析摘要</h2>
+          <p class="text-gray-700 leading-relaxed text-lg">
+            {{ results.aiAnalysis.summary }}
+          </p>
+          <div v-if="results.aiAnalysis.prediction" class="mt-4 p-4 bg-blue-50 rounded-lg">
+            <p class="text-blue-800">
+              <strong>性能预测：</strong>{{ results.aiAnalysis.prediction }}
+            </p>
           </div>
+        </div>
+
+        <!-- Radar Chart - Core Web Vitals -->
+        <div class="bg-white rounded-lg shadow-lg p-6">
+          <h2 class="text-2xl font-bold mb-4">核心 Web 指标雷达图</h2>
+          <RadarChart :metrics="results.lighthouse.metrics" />
         </div>
 
         <!-- Metrics Cards -->
@@ -94,52 +120,97 @@
           />
         </div>
 
-        <!-- AI Analysis Summary -->
+        <!-- Resource Statistics -->
         <div class="bg-white rounded-lg shadow-lg p-6">
-          <h2 class="text-2xl font-bold mb-4">🤖 AI 分析摘要</h2>
-          <p class="text-gray-700 leading-relaxed">
-            {{ results.aiAnalysis.summary }}
-          </p>
+          <h2 class="text-2xl font-bold mb-4">资源体积分析</h2>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <PieChart :resources="results.lighthouse.resources" />
+            </div>
+            <div class="space-y-4">
+              <div class="p-4 bg-gray-50 rounded-lg">
+                <div class="text-sm text-gray-600 mb-2">总资源大小</div>
+                <div class="text-2xl font-bold text-orange-600">
+                  {{ results.lighthouse.resources?.totalSize || 0 }} KB
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-4">
+                <div class="p-3 bg-blue-50 rounded">
+                  <div class="text-xs text-gray-600">JavaScript</div>
+                  <div class="text-lg font-semibold">{{ results.lighthouse.resources?.jsTotalSize || 0 }} KB</div>
+                </div>
+                <div class="p-3 bg-green-50 rounded">
+                  <div class="text-xs text-gray-600">CSS</div>
+                  <div class="text-lg font-semibold">{{ results.lighthouse.resources?.cssTotalSize || 0 }} KB</div>
+                </div>
+                <div class="p-3 bg-yellow-50 rounded">
+                  <div class="text-xs text-gray-600">图片</div>
+                  <div class="text-lg font-semibold">{{ results.lighthouse.resources?.imageTotalSize || 0 }} KB</div>
+                </div>
+                <div class="p-3 bg-purple-50 rounded">
+                  <div class="text-xs text-gray-600">第三方</div>
+                  <div class="text-lg font-semibold">{{ results.lighthouse.resources?.thirdPartySize || 0 }} KB</div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <!-- Performance Issues -->
+        <!-- Request Statistics -->
         <div class="bg-white rounded-lg shadow-lg p-6">
-          <h2 class="text-2xl font-bold mb-4">性能问题</h2>
+          <h2 class="text-2xl font-bold mb-4">请求统计</h2>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div class="p-4 bg-gray-50 rounded-lg">
+              <div class="text-sm text-gray-600 mb-1">总请求数</div>
+              <div class="text-3xl font-bold">{{ results.lighthouse.requests?.total || 0 }}</div>
+            </div>
+            <div class="p-4 bg-orange-50 rounded-lg">
+              <div class="text-sm text-gray-600 mb-1">第三方请求</div>
+              <div class="text-3xl font-bold">{{ results.lighthouse.requests?.thirdParty || 0 }}</div>
+            </div>
+            <div class="p-4 bg-blue-50 rounded-lg">
+              <div class="text-sm text-gray-600 mb-1">第三方占比</div>
+              <div class="text-3xl font-bold">{{ results.lighthouse.requests?.thirdPartyRatio || 0 }}%</div>
+            </div>
+          </div>
+          <div v-if="results.lighthouse.requests?.slowRequests?.length > 0">
+            <h3 class="text-xl font-semibold mb-4">慢请求 Top 10</h3>
+            <BarChart :slowRequests="results.lighthouse.requests.slowRequests" />
+          </div>
+        </div>
+
+        <!-- Main Thread Analysis -->
+        <div class="bg-white rounded-lg shadow-lg p-6">
+          <h2 class="text-2xl font-bold mb-4">主线程耗时分析</h2>
+          <LineChart :mainThread="results.lighthouse.mainThread" />
+        </div>
+
+        <!-- Waterfall Timeline -->
+        <div v-if="results.lighthouse.timeline?.length > 0" class="bg-white rounded-lg shadow-lg p-6">
+          <h2 class="text-2xl font-bold mb-4">资源加载时间线（瀑布流）</h2>
+          <WaterfallChart :timeline="results.lighthouse.timeline" />
+        </div>
+
+        <!-- Performance Problems -->
+        <div v-if="results.aiAnalysis.problems?.length > 0" class="bg-white rounded-lg shadow-lg p-6">
+          <h2 class="text-2xl font-bold mb-4">性能瓶颈识别</h2>
           <div class="space-y-4">
-            <IssueCard
-              v-for="(issue, index) in results.aiAnalysis.issues"
+            <ProblemCard
+              v-for="(problem, index) in results.aiAnalysis.problems"
               :key="index"
-              :issue="issue"
-              :index="index + 1"
+              :problem="problem"
             />
           </div>
         </div>
 
-        <!-- Recommendations -->
-        <div class="bg-white rounded-lg shadow-lg p-6">
-          <h2 class="text-2xl font-bold mb-4">优化建议</h2>
+        <!-- Optimization Suggestions -->
+        <div v-if="results.aiAnalysis.suggestions?.length > 0" class="bg-white rounded-lg shadow-lg p-6">
+          <h2 class="text-2xl font-bold mb-4">优化建议与代码示例</h2>
           <div class="space-y-4">
-            <RecommendationCard
-              v-for="(rec, index) in results.aiAnalysis.recommendations"
+            <SuggestionCard
+              v-for="(suggestion, index) in results.aiAnalysis.suggestions"
               :key="index"
-              :recommendation="rec"
-              :index="index + 1"
-            />
-          </div>
-        </div>
-
-        <!-- Code Examples -->
-        <div
-          v-if="results.aiAnalysis.codeExamples.length > 0"
-          class="bg-white rounded-lg shadow-lg p-6"
-        >
-          <h2 class="text-2xl font-bold mb-4">代码示例</h2>
-          <div class="space-y-4">
-            <CodeExampleCard
-              v-for="(example, index) in results.aiAnalysis.codeExamples"
-              :key="index"
-              :example="example"
-              :index="index + 1"
+              :suggestion="suggestion"
             />
           </div>
         </div>
@@ -162,73 +233,22 @@
 import { ref, computed } from "vue";
 import { use } from "echarts/core";
 import { CanvasRenderer } from "echarts/renderers";
-import { BarChart } from "echarts/charts";
-import {
-  TitleComponent,
-  TooltipComponent,
-  LegendComponent,
-  GridComponent,
-} from "echarts/components";
 import VChart from "vue-echarts";
 import axios from "axios";
 import MetricCard from "./components/MetricCard.vue";
-import IssueCard from "./components/IssueCard.vue";
-import RecommendationCard from "./components/RecommendationCard.vue";
-import CodeExampleCard from "./components/CodeExampleCard.vue";
+import ProblemCard from "./components/ProblemCard.vue";
+import SuggestionCard from "./components/SuggestionCard.vue";
+import RadarChart from "./components/Charts/RadarChart.vue";
+import PieChart from "./components/Charts/PieChart.vue";
+import BarChart from "./components/Charts/BarChart.vue";
+import LineChart from "./components/Charts/LineChart.vue";
+import WaterfallChart from "./components/Charts/WaterfallChart.vue";
 
-use([
-  CanvasRenderer,
-  BarChart,
-  TitleComponent,
-  TooltipComponent,
-  LegendComponent,
-  GridComponent,
-]);
+use([CanvasRenderer]);
 
 const url = ref("");
 const loading = ref(false);
 const results = ref(null);
-
-const chartOption = computed(() => {
-  if (!results.value) return null;
-
-  const metrics = results.value.lighthouse.metrics;
-  return {
-    tooltip: {
-      trigger: "axis",
-      axisPointer: { type: "shadow" },
-    },
-    xAxis: {
-      type: "category",
-      data: ["LCP", "FID", "CLS", "FCP", "TBT"],
-    },
-    yAxis: {
-      type: "value",
-    },
-    series: [
-      {
-        name: "数值",
-        type: "bar",
-        data: [
-          metrics.lcp?.toFixed(0) || 0,
-          metrics.fid?.toFixed(0) || 0,
-          metrics.cls?.toFixed(3) || 0,
-          metrics.fcp?.toFixed(0) || 0,
-          metrics.tbt?.toFixed(0) || 0,
-        ],
-        itemStyle: {
-          color: (params) => {
-            if (params.dataIndex === 0) return "#ff6b00"; // LCP
-            if (params.dataIndex === 1) return "#ff9933"; // FID
-            if (params.dataIndex === 2) return "#ffb366"; // CLS
-            if (params.dataIndex === 3) return "#ffcc99"; // FCP
-            return "#ffe6cc"; // TBT
-          },
-        },
-      },
-    ],
-  };
-});
 
 function getScoreColor(score) {
   if (score >= 90) return "text-green-600";
