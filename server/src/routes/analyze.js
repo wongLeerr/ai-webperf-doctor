@@ -62,14 +62,14 @@ router.post("/", async (req, res) => {
     // Save to local file (optional)
     const fs = await import("fs/promises");
     const reportsDir = "./reports";
-    try {
-      await fs.mkdir(reportsDir, { recursive: true });
-      const filename = `${reportsDir}/report-${Date.now()}.json`;
-      await fs.writeFile(filename, JSON.stringify(response, null, 2));
-      console.log(`💾 Report saved to ${filename}`);
-    } catch (err) {
-      console.warn("Failed to save report:", err);
-    }
+    // try {
+    //   await fs.mkdir(reportsDir, { recursive: true });
+    //   const filename = `${reportsDir}/report-${Date.now()}.json`;
+    //   await fs.writeFile(filename, JSON.stringify(response, null, 2));
+    //   console.log(`💾 Report saved to ${filename}`);
+    // } catch (err) {
+    //   console.warn("Failed to save report:", err);
+    // }
 
     res.json(response);
   } catch (error) {

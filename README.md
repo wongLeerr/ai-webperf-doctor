@@ -1,11 +1,11 @@
 # 🏥 AI WebPerf Doctor
 
-AI-powered web performance analyzer using Lighthouse and DDAI API. Automatically analyze website performance, get AI-generated insights, and export detailed PDF reports.
+AI-powered web performance analyzer using Lighthouse and DeepSeek API. Automatically analyze website performance, get AI-generated insights, and export detailed PDF reports.
 
 ## ✨ Features
 
 - 🔍 **Automated Performance Analysis**: Uses Lighthouse to capture real performance metrics
-- 🤖 **AI-Powered Insights**: DDAI API analyzes performance data and provides actionable recommendations
+- 🤖 **AI-Powered Insights**: DeepSeek API analyzes performance data and provides actionable recommendations
 - 📊 **Visual Charts**: Beautiful ECharts visualizations of Core Web Vitals (LCP, FID, CLS)
 - 📝 **Detailed Reports**: Comprehensive analysis including issues, recommendations, and code examples
 - 📄 **PDF Export**: Generate and download detailed PDF reports
@@ -22,7 +22,7 @@ AI-powered web performance analyzer using Lighthouse and DDAI API. Automatically
 ### Backend
 - Node.js + Express + JavaScript
 - Lighthouse for performance analysis
-- DDAI API (via curl) for AI analysis
+- DeepSeek API for AI analysis
 - PDFKit for report generation
 
 ## 📦 Installation
@@ -31,7 +31,7 @@ AI-powered web performance analyzer using Lighthouse and DDAI API. Automatically
 
 - Node.js 18+ and npm
 - Chrome/Chromium browser (for Lighthouse)
-- curl command (usually pre-installed)
+- DeepSeek API key (get one from [DeepSeek](https://www.deepseek.com/))
 
 ### Setup
 
@@ -48,11 +48,13 @@ npm run install:all
 2. **Configure environment variables (optional):**
 
 ```bash
-# Copy the example env file (optional, DDAI config is hardcoded)
+# Copy the example env file and configure DeepSeek API
 cp env.example .env
 
-# Edit .env if you want to change the port
-PORT=3001
+# Edit .env and add your DeepSeek API key
+# DEEPSEEK_API_KEY=your_deepseek_api_key_here
+# DEEPSEEK_MODEL=deepseek-chat
+# PORT=3001
 ```
 
 
@@ -179,9 +181,11 @@ ai-webperf-doctor/
 
 ### Environment Variables
 
+- `DEEPSEEK_API_KEY`: Your DeepSeek API key (required)
+- `DEEPSEEK_MODEL`: DeepSeek model to use (default: `deepseek-chat`)
 - `PORT`: Server port (default: 3001)
 
-**Note**: DDAI API configuration is hardcoded in the code. The API endpoint, App ID, and model settings are configured in `server/src/services/ai.js`.
+**Note**: DeepSeek API configuration is set via environment variables. The API endpoint and model settings can be configured in `server/src/services/ai.js` or via environment variables.
 
 ### Lighthouse Configuration
 
@@ -203,10 +207,11 @@ sudo apt-get install chromium-browser
 # Or use Chrome if already installed
 ```
 
-### DDAI API Errors
+### DeepSeek API Errors
 
-- Check network connectivity to DDAI endpoint
-- Verify curl command is available in system PATH
+- Verify `DEEPSEEK_API_KEY` is set in `.env` file
+- Check network connectivity to DeepSeek API endpoint (https://api.deepseek.com)
+- Verify the API key is valid and has sufficient credits
 - Check server logs for detailed error messages
 
 ### Port Already in Use
@@ -233,6 +238,6 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## 🙏 Acknowledgments
 
 - [Lighthouse](https://github.com/GoogleChrome/lighthouse) for performance analysis
-- [OpenAI](https://openai.com/) for AI capabilities
+- [DeepSeek](https://www.deepseek.com/) for AI capabilities
 - [Vue.js](https://vuejs.org/) for the frontend framework
 - [ECharts](https://echarts.apache.org/) for data visualization

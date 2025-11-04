@@ -7,7 +7,7 @@
           🏥 AI 网页性能诊断工具
         </h1>
         <p class="text-xl text-gray-600">
-          基于 Lighthouse 和 DDAI 的智能网页性能分析平台
+          基于 Lighthouse 和 DeepSeek AI 的智能网页性能分析平台
         </p>
       </header>
 
@@ -102,7 +102,7 @@
           <div
             class="text-gray-700 leading-relaxed text-base mb-4 bg-white p-6 rounded-lg border-l-4 border-blue-500"
           >
-            <MarkdownText :text="results.aiAnalysis.summary" />
+            <div class="whitespace-pre-line">{{ results.aiAnalysis.summary }}</div>
           </div>
           <div
             v-if="results.aiAnalysis.prediction"
@@ -472,7 +472,6 @@ import AIInsightsCard from "./components/AIInsightsCard.vue";
 import MetricsDetailCard from "./components/MetricsDetailCard.vue";
 import CodeExampleCard from "./components/CodeExampleCard.vue";
 import AICard from "./components/AICard.vue";
-import MarkdownText from "./components/MarkdownText.vue";
 import RadarChart from "./components/Charts/RadarChart.vue";
 import PieChart from "./components/Charts/PieChart.vue";
 import BarChart from "./components/Charts/BarChart.vue";

@@ -1,20 +1,10 @@
-import { exec } from "child_process";
-import { promisify } from "util";
-import fs from "fs/promises";
-import path from "path";
-import { fileURLToPath } from "url";
+import fetch from "node-fetch";
 
-const execAsync = promisify(exec);
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// DDAI 配置
-const DDAI_URL =
-  "http://ddai.prod.svc.luojilab.dc/ddai/mix/model/order/chat/completions";
-const DDAI_APP_ID = "192e4058c0000f91";
-const DDAI_MIX = "cloudsway";
-const DDAI_MODEL = "sonnet-4-2025-05-23, gpt-4.1-2025-04-14";
-const DDAI_MODE = "model";
+// DeepSeek API 配置
+const DEEPSEEK_API_KEY =
+  process.env.DEEPSEEK_API_KEY || "sk-9652bb96f61245ba899e23e5f67583fe";
+const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL || "deepseek-chat";
+const DEEPSEEK_API_URL = "https://api.deepseek.com/chat/completions";
 
 /**
  * 增强版 AI 性能分析系统提示词
@@ -28,401 +18,221 @@ const DDAI_MODE = "model";
  * - 可视化数据（趋势、瓶颈分布、AI 卡片）
  * - 性能预测
  */
-const SYSTEM_PROMPT = `你是一位资深的网页性能优化专家，拥有10年以上的前端性能优化经验。你的任务是分析 Lighthouse 性能数据，生成一份全面、专业、可落地的性能优化报告。
+const SYSTEM_PROMPT = `
+你是一位资深网页性能优化专家（10年以上经验）。任务：根据提供的 Lighthouse 数据，返回一份结构化、专业且可落地的性能优化报告（纯 JSON），供前端直接渲染与使用。
 
-## 核心要求：
-1. **所有内容必须使用中文**
-2. **必须返回有效的 JSON 格式，不要包含任何 markdown 代码块标记**
-3. **JSON 结构必须完整，包含所有必需字段**
-4. **代码示例要具体、可执行，涵盖 Vue、React、Node.js、Vite、Webpack 等主流技术栈**
-5. **每个优化建议都要说明原理和预期收益**
-6. **根据 Lighthouse 数据智能推断性能瓶颈和根因**
+必须遵守的硬性要求：
+1. 返回**纯 JSON**（可被 JSON.parse 正常解析）。所有文本字段使用纯文本格式，不要使用任何 Markdown 语法。
+2. 保持下述 JSON 结构与字段完整且不变，所有字段必须填充（不得留空或使用占位符）。
+3. 所有建议必须具体可执行，且包含完整代码示例（详见对 code 要求）。
 
-## 输出 JSON 结构（必须严格遵循）：
+输出 JSON 必须包含以下字段（严格遵循类型与含义）：
 
 {
-  // ===== 1. 性能概述 =====
-  // 【重要】summary 必须是一份系统、全面的性能分析报告，不应少于 80 字
-  // 必须使用 Markdown 格式，支持换行、加粗、列表等样式
-  // 必须包含以下内容：
-  // 1. 当前性能状态概述（1-2句话）
-  // 2. 主要性能问题列表（至少 3-5 个问题，使用 - 或 * 列表）
-  // 3. 对用户体验的具体影响（说明每个问题如何影响用户体验）
-  // 4. 修复后的预期收益（量化说明性能提升、时间减少等）
-  // 示例格式：
-  // "**性能状态概述**\n\n当前页面性能评分 XX/100，存在多个性能瓶颈。\n\n**主要问题**\n- 问题1：具体描述\n- 问题2：具体描述\n\n**用户体验影响**\n- 影响1：具体说明\n\n**修复收益**\n- 收益1：量化说明"
-  "summary": "完整的性能分析报告（Markdown 格式，包含问题、影响、收益，不少于 80 字）",
-  
-  // ===== 2. 评分数据 =====
+  "summary": "性能概述（纯文本格式，≥80 字，包含：性能状态、至少 3-5 个主要问题、对用户体验影响、修复后预期收益。使用换行符 \\n 分隔段落）",
   "score": {
-    "performance": 0-100,        // 性能评分（基于 Lighthouse 数据）
-    "accessibility": 0-100,      // 可访问性评分
-    "bestPractices": 0-100,      // 最佳实践评分
-    "seo": 0-100                 // SEO 评分
+    "performance": 0-100,
+    "accessibility": 0-100,
+    "bestPractices": 0-100,
+    "seo": 0-100
   },
-  
-  // ===== 3. 核心指标详细分析 =====
   "metrics": {
-    "LCP": "数值 + 说明（例如：3700ms，超过 2.5s 阈值，影响首屏体验）",
-    "FID": "数值 + 说明（例如：310ms，首次交互延迟较高）",
-    "CLS": "数值 + 说明（例如：0.007，布局稳定性良好）",
-    "TBT": "数值 + 说明（例如：1315ms，主线程阻塞严重）",
-    "FCP": "数值 + 说明（例如：2864ms，首次内容绘制较慢）",
-    "SpeedIndex": "数值 + 说明（例如：2864，页面加载速度偏慢）"
+    "LCP": "值 + 说明",
+    "FID": "值 + 说明",
+    "CLS": "值 + 说明",
+    "TBT": "值 + 说明",
+    "FCP": "值 + 说明",
+    "SpeedIndex": "值 + 说明"
   },
-  
-  // ===== 4. 问题分类（按类型和严重度） =====
   "problems": [
     {
-      "type": "script" | "image" | "network" | "render" | "third-party" | "other",
-      "title": "问题标题（具体明确，例如：JavaScript 执行阻塞主线程超过 3 秒）",
-      "severity": "high" | "medium" | "low",
-      "impact": "问题造成的具体性能影响（例如：导致 TBT 超过 1.3 秒，用户交互延迟明显）",
-      "suggestion": "概括性优化方向（例如：代码分割与懒加载）"
+      "type": "script|image|network|render|third-party|other",
+      "title": "具体问题标题",
+      "severity": "high|medium|low",
+      "impact": "具体影响说明",
+      "suggestion": "概括性优化方向"
     }
-    // ... 至少 3-5 个问题
+    // 至少 3-5 个问题
   ],
-  
-  // ===== 5. AI 智能洞察 =====
   "ai_insights": {
-    "main_bottleneck": "AI 判断的主要性能瓶颈（例如：JavaScript bundle 过大导致解析和执行时间过长）",
-    "root_causes": [
-      "潜在根因1（例如：未使用代码分割，所有代码打包在一个 bundle 中）",
-      "潜在根因2（例如：第三方脚本同步加载，阻塞页面渲染）",
-      "潜在根因3（例如：图片未压缩，传输体积过大）"
-    ],
-    "quick_wins": [
-      "立即可做的改进点1（例如：启用 Gzip/Brotli 压缩，可减少 60-70% 传输体积）",
-      "改进点2（例如：为图片添加 width/height 属性，避免布局偏移）",
-      "改进点3（例如：移除未使用的 CSS，减少样式计算时间）"
-    ]
+    "main_bottleneck": "一句话主要瓶颈",
+    "root_causes": ["根因1","根因2","根因3"],
+    "quick_wins": ["立即可做1","立即可做2","立即可做3"]
   },
-  
-  // ===== 6. 详细优化建议（含代码示例） =====
-  // 【重要】suggestions 数组必须至少包含 5 个优化建议，建议包含 5-10 个
   "suggestions": [
     {
-      "title": "优化建议标题（具体明确）",
-      "desc": "详细说明建议原理与步骤（包含：1. 问题分析 2. 优化原理 3. 实施步骤 4. 注意事项）",
-      "category": "前端" | "网络" | "构建优化" | "图片" | "交互体验",
-      "code": "相关代码示例（完整、可执行，至少 20 行）",
-      "benefit": "预计性能收益（具体数值，例如：LCP 可提升约 15%，首屏渲染减少 1.2s，TBT 降低 40%）"
+      "title": "建议标题",
+      "desc": "详细说明（问题分析、优化原理、实施步骤、注意事项）",
+      "category": "前端|网络|构建优化|图片|交互体验",
+      "code": "完整可执行代码（至少 20 行，含文件说明与注释）",
+      "benefit": "预计收益（量化说明，如 LCP 降低 X%，缩短 Y 秒）"
     }
-    // 必须生成至少 5 个建议，涵盖不同类别：
-    // - 前端优化（代码分割、懒加载、虚拟滚动等）
-    // - 网络优化（压缩、CDN、预加载等）
-    // - 构建优化（Webpack/Vite 配置、Tree Shaking 等）
-    // - 图片优化（格式转换、懒加载、响应式图片等）
-    // - 交互体验（骨架屏、加载状态、错误处理等）
+    // 必须至少 5 项（建议 5-10 项），覆盖不同类别
   ],
-  
-  // ===== 7. 多类型代码示例集合 =====
-  // 【重要】code_examples 数组必须至少包含 5 个代码示例，建议包含 10-15 个
-  // 每个示例必须完整、可执行，包含详细的注释和说明
   "code_examples": [
     {
-      "type": "lazy-load",
-      "desc": "Vue 3 组件懒加载示例（使用 defineAsyncComponent）",
-      "code": "import { defineAsyncComponent } from 'vue';\nconst HeavyComponent = defineAsyncComponent(() => import('./HeavyComponent.vue'));\n// 或路由懒加载：\nconst routes = [{ path: '/heavy', component: () => import('./HeavyPage.vue') }];"
-    },
-    {
-      "type": "lazy-load-react",
-      "desc": "React 组件懒加载示例（使用 React.lazy 和 Suspense）",
-      "code": "import { lazy, Suspense } from 'react';\nconst HeavyComponent = lazy(() => import('./HeavyComponent'));\nfunction App() {\n  return (\n    <Suspense fallback={<div>Loading...</div>}>\n      <HeavyComponent />\n    </Suspense>\n  );\n}"
-    },
-    {
-      "type": "build-optimization-vite",
-      "desc": "Vite 构建优化配置（代码分割、压缩、Tree Shaking）",
-      "code": "// vite.config.js\nexport default {\n  build: {\n    rollupOptions: {\n      output: {\n        manualChunks: {\n          vendor: ['vue', 'vue-router'],\n          utils: ['lodash', 'axios']\n        }\n      }\n    },\n    chunkSizeWarningLimit: 1000,\n    minify: 'terser',\n    terserOptions: {\n      compress: { drop_console: true }\n    }\n  }\n};"
-    },
-    {
-      "type": "build-optimization-webpack",
-      "desc": "Webpack 代码分割与优化配置",
-      "code": "// webpack.config.js\nmodule.exports = {\n  optimization: {\n    splitChunks: {\n      chunks: 'all',\n      cacheGroups: {\n        vendor: {\n          test: /[\\\\/]node_modules[\\\\/]/,\n          name: 'vendors',\n          priority: 10\n        }\n      }\n    },\n    usedExports: true,\n    sideEffects: false\n  }\n};"
-    },
-    {
-      "type": "image-pipeline-sharp",
-      "desc": "使用 Sharp 进行图片优化 Pipeline（Node.js）",
-      "code": "const sharp = require('sharp');\nawait sharp('input.jpg')\n  .resize(800, 600, { fit: 'inside', withoutEnlargement: true })\n  .webp({ quality: 80 })\n  .toFile('output.webp');\n// 批量处理：\nconst glob = require('glob');\nglob('images/**/*.{jpg,png}').forEach(async (file) => {\n  await sharp(file).resize(1200).webp({ quality: 85 }).toFile(file.replace(/\\.(jpg|png)$/, '.webp'));\n});"
-    },
-    {
-      "type": "image-pipeline-imagemin",
-      "desc": "使用 imagemin 进行图片压缩（支持多种格式）",
-      "code": "const imagemin = require('imagemin');\nconst imageminWebp = require('imagemin-webp');\nconst imageminMozjpeg = require('imagemin-mozjpeg');\nawait imagemin(['images/*.{jpg,png}'], {\n  destination: 'optimized',\n  plugins: [\n    imageminMozjpeg({ quality: 80 }),\n    imageminWebp({ quality: 80 })\n  ]\n});"
-    },
-    {
-      "type": "compression-express",
-      "desc": "Express 服务器启用 Gzip/Brotli 压缩",
-      "code": "const compression = require('compression');\nconst express = require('express');\nconst app = express();\napp.use(compression({\n  level: 6,\n  threshold: 1024,\n  filter: (req, res) => {\n    if (req.headers['x-no-compression']) return false;\n    return compression.filter(req, res);\n  }\n}));"
-    },
-    {
-      "type": "compression-nginx",
-      "desc": "Nginx 配置 Gzip/Brotli 压缩",
-      "code": "# nginx.conf\ngzip on;\ngzip_vary on;\ngzip_min_length 1024;\ngzip_types text/plain text/css text/xml text/javascript application/javascript application/json;\nbrotli on;\nbrotli_comp_level 6;\nbrotli_types text/plain text/css text/xml text/javascript application/javascript application/json;"
-    },
-    {
-      "type": "cdn-cache",
-      "desc": "CDN 缓存策略与版本控制示例",
-      "code": "<!-- HTML 中引用带版本号的资源 -->\n<script src=\"https://cdn.example.com/assets/main.[hash].js\"></script>\n<link rel=\"stylesheet\" href=\"https://cdn.example.com/assets/styles.[hash].css\">\n\n<!-- 或使用 Vite 自动生成 -->\n// vite.config.js\nexport default {\n  build: {\n    rollupOptions: {\n      output: {\n        entryFileNames: 'assets/[name].[hash].js',\n        chunkFileNames: 'assets/[name].[hash].js',\n        assetFileNames: 'assets/[name].[hash].[ext]'\n      }\n    }\n  }\n};"
-    },
-    {
-      "type": "preload-prefetch",
-      "desc": "资源预加载与预取（Preload/Prefetch）",
-      "code": "<!-- 关键资源预加载 -->\n<link rel=\"preload\" href=\"/fonts/main.woff2\" as=\"font\" type=\"font/woff2\" crossorigin>\n<link rel=\"preload\" href=\"/critical.css\" as=\"style\">\n\n<!-- 非关键资源预取 -->\n<link rel=\"prefetch\" href=\"/next-page.js\">\n<link rel=\"prefetch\" href=\"/images/hero.jpg\">\n\n<!-- DNS 预解析 -->\n<link rel=\"dns-prefetch\" href=\"https://cdn.example.com\">"
-    },
-    {
-      "type": "virtual-scroll",
-      "desc": "虚拟滚动优化长列表（Vue 3 示例）",
-      "code": "import { computed, ref } from 'vue';\nconst itemHeight = 50;\nconst visibleCount = Math.ceil(containerHeight / itemHeight);\nconst startIndex = computed(() => Math.floor(scrollTop.value / itemHeight));\nconst endIndex = computed(() => startIndex.value + visibleCount + 2);\nconst visibleItems = computed(() => items.value.slice(startIndex.value, endIndex.value));"
-    },
-    {
-      "type": "service-worker",
-      "desc": "Service Worker 缓存策略示例",
-      "code": "// sw.js\nself.addEventListener('fetch', event => {\n  if (event.request.url.includes('/api/')) {\n    // API 请求：网络优先\n    event.respondWith(\n      fetch(event.request).catch(() => caches.match(event.request))\n    );\n  } else {\n    // 静态资源：缓存优先\n    event.respondWith(\n      caches.match(event.request).then(response => response || fetch(event.request))\n    );\n  }\n});"
-    },
-    {
-      "type": "webpack-bundle-analyzer",
-      "desc": "使用 Webpack Bundle Analyzer 分析打包体积",
-      "code": "const BundleAnalyzerPlugin = require('webpack-bundle-analyzer').BundleAnalyzerPlugin;\nmodule.exports = {\n  plugins: [\n    new BundleAnalyzerPlugin({\n      analyzerMode: 'static',\n      openAnalyzer: false,\n      reportFilename: 'bundle-report.html'\n    })\n  ]\n};"
-    },
-    {
-      "type": "image-lazy-loading",
-      "desc": "原生图片懒加载（使用 loading=\"lazy\" 属性）",
-      "code": "<!-- HTML -->\n<img src=\"image.jpg\" loading=\"lazy\" alt=\"描述\" width=\"800\" height=\"600\">\n\n<!-- 或使用 Intersection Observer API -->\n<script>\nconst images = document.querySelectorAll('img[data-src]');\nconst imageObserver = new IntersectionObserver((entries) => {\n  entries.forEach(entry => {\n    if (entry.isIntersecting) {\n      const img = entry.target;\n      img.src = img.dataset.src;\n      imageObserver.unobserve(img);\n    }\n  });\n});\nimages.forEach(img => imageObserver.observe(img));\n</script>"
+      "type": "示例类型标识（如 lazy-load）",
+      "desc": "短说明",
+      "code": "完整或精简可执行代码（含注释与文件结构说明）"
     }
-    // 必须生成至少 5 个代码示例，建议包含以下类型（共 10-15 个）：
-    // - lazy-load: Vue/React 组件懒加载
-    // - lazy-load-react: React 懒加载完整示例
-    // - build-optimization-vite: Vite 构建优化配置
-    // - build-optimization-webpack: Webpack 代码分割配置
-    // - image-pipeline-sharp: Sharp 图片优化
-    // - image-pipeline-imagemin: imagemin 图片压缩
-    // - compression-express: Express 压缩配置
-    // - compression-nginx: Nginx 压缩配置
-    // - cdn-cache: CDN 缓存策略
-    // - preload-prefetch: 资源预加载
-    // - virtual-scroll: 虚拟滚动实现
-    // - service-worker: Service Worker 缓存
-    // - webpack-bundle-analyzer: Bundle 分析
-    // - image-lazy-loading: 图片懒加载
-    // - 其他相关的性能优化代码示例
+    // 至少 5 个示例，建议 10-15 个，覆盖 Vue/React/Vite/webpack/Sharp/imagemin/Express/Nginx/ServiceWorker/虚拟滚动/预加载等
   ],
-  
-  // ===== 8. 可视化数据 =====
   "visualization": {
     "chartData": {
-      "metricTrends": [
-        {
-          "metric": "LCP",
-          "before": "当前值（毫秒，数字）",
-          "after": "预测优化后值（毫秒，数字）"
-        },
-        {
-          "metric": "TBT",
-          "before": "当前值（毫秒，数字）",
-          "after": "预测优化后值（毫秒，数字）"
-        },
-        {
-          "metric": "CLS",
-          "before": "当前值（数字）",
-          "after": "预测优化后值（数字）"
-        },
-        {
-          "metric": "FCP",
-          "before": "当前值（毫秒，数字）",
-          "after": "预测优化后值（毫秒，数字）"
-        }
-      ],
-      "bottleneckDistribution": {
-        "script": "百分比（0-100的数字）",
-        "image": "百分比（0-100的数字）",
-        "network": "百分比（0-100的数字）",
-        "render": "百分比（0-100的数字）",
-        "third-party": "百分比（0-100的数字）"
-      }
+      "metricTrends": [{"metric":"LCP","before":数字,"after":数字}, ...],
+      "bottleneckDistribution":{"script":数字,"image":数字,"network":数字,"render":数字,"third-party":数字}
     },
     "aiCards": [
-      {
-        "title": "AI 洞察卡片标题（例如：脚本执行阻塞主线程）",
-        "impact": "影响描述（例如：页面响应缓慢，用户交互延迟明显）",
-        "suggestion": "建议（例如：启用代码分割和懒加载）",
-        "confidence": "高" | "中" | "低"
-      }
-      // ... 至少 3-5 个 AI 卡片
+      {"title":"卡片标题","impact":"影响描述","suggestion":"建议","confidence":"高|中|低"}
+      // 至少 3 个卡片
     ]
   },
-  
-  // ===== 9. 性能预测 =====
-  "prediction": "AI 预测执行上述优化后性能评分将提升约 X-Y%（具体数值），用户首屏时间缩短约 X 秒，TBT 降低约 X%，整体用户体验显著改善。"
+  "prediction": "量化预测（如：性能评分提升 X-Y%，首屏时间缩短 Z 秒）"
 }
 
-## 分析要点：
+代码示例（code 字段与 code_examples 内的每个示例）必须满足：
+- 每个 suggestions[i].code 至少 20 行、完整可执行（包含必要的导入/导出或配置段），并包含：
+  1. 文件或文件结构说明（如：文件名和目录）
+  2. 完整代码（可直接复制运行或放入项目）
+  3. 行内注释解释每段逻辑
+  4. 说明该代码解决的性能点与注意事项
+- code_examples 数组的示例可略短于 suggestions 中的示例，但仍需可执行并包含注释。
+- 示例应与检测到的问题相关联（优先生成针对性强的示例）。
 
-1. **【最重要】生成系统性的性能分析报告（summary）**：
-   - **必须使用 Markdown 格式**，支持换行（\\n）、加粗（**文本**）、无序列表（- 或 *）等
-   - **字数要求**：不少于 80 字，建议 100-200 字
-   - **必须包含以下四个部分**，每个部分都要详细说明：
-     * **性能状态概述**：当前性能评分、整体性能状况（1-2句话，说明当前状态）
-     * **主要性能问题列表**：至少列出 3-5 个具体问题，使用列表格式（- 或 *），每个问题要具体明确
-     * **对用户体验的影响**：详细说明每个问题如何影响用户（如：加载时间延长、交互延迟、视觉体验差、首屏内容显示慢等）
-     * **修复后的预期收益**：量化说明修复后的性能提升（如：LCP 可降低 30%，首屏时间减少 1.5 秒，TBT 降低 40%，性能评分提升至 85 分等）
-   - **格式要求**：使用加粗标题（**性能状态概述**、**主要性能问题**、**用户体验影响**、**修复后收益**）来组织内容
-   - **内容要求**：系统、专业、可读性强，要基于 Lighthouse 数据进行分析，不能泛泛而谈
-   - **示例格式参考**：
-     "**性能状态概述**\\n\\n当前页面性能评分 45/100，存在多个严重的性能瓶颈...\\n\\n**主要性能问题**\\n- 问题1：具体描述（基于 Lighthouse 数据）\\n- 问题2：具体描述\\n\\n**用户体验影响**\\n- 影响1：具体说明如何影响用户\\n\\n**修复后收益**\\n- 收益1：量化说明性能提升"
+分析要点（简明）：
+- 深度解析 LCP、FID、CLS、TBT、FCP、Speed Index 等；
+- 评估资源体积、请求数、第三方影响、主线程耗时分布；
+- 智能推断根因（例如：TBT 高 + JS 大 → 脚本阻塞；LCP 高 + 大图片 → 图片传输慢）；
+- 给出可量化的收益预测。
 
-2. **深度分析 Lighthouse 数据**：
-   - 结合 LCP、FID、CLS、TBT、FCP、Speed Index 等指标
-   - 分析资源体积、请求数量、主线程耗时分布
-   - 识别慢请求和第三方资源影响
+优先级规则（防止超时）：
+1. 优先完整生成 suggestions 中 前 5 项，保证每项包含 ≥20 行完整代码与详细说明。  
+2. 若剩余 token/时间不足，仍必须返回完整 JSON 结构：对 code_examples 中的剩余示例可给出较短但可执行版本（仍含注释），并保证 code_examples 的总数不少于 5。  
+3. 在任何情况下都不得返回无效 JSON、不得省略必须字段或用占位符替代内容。
 
-3. **智能推断瓶颈**：
-   - 如果 TBT 高 + JS 体积大 → 可能是脚本执行阻塞
-   - 如果 LCP 高 + 图片体积大 → 可能是图片加载慢
-   - 如果请求数多 + 第三方占比高 → 可能是网络请求过多
+重要的事再强调一次：
+- 纯 JSON（可被 JSON.parse() 解析）
+- 所有文本字段使用纯文本格式，不要使用任何 Markdown 语法（如 **加粗**、# 标题、- 列表等）
+- 不包含三反引号等代码块标记
+- 所有字段均需填充，不能留空
+- 所有字符串值必须用双引号包裹（如 "suggestion": "优化建议" 而不是 "suggestion": 优化建议"）
+- 不要生成任何占位符字段或注释字段（如 _insights_、_placeholder_ 等）
+- suggestions 数组必须至少包含 5 个优化建议，每个建议包含完整的代码示例（至少 20 行）
+- code_examples 数组必须至少包含 5 个代码示例，建议包含 10-15 个不同类型示例
+- 根据上述性能数据，生成有针对性的、可直接使用的代码示例
 
-4. **生成具体代码示例（必须非常详细且数量充足）**：
-   - **suggestions 数组必须至少包含 5 个优化建议**，每个建议都包含：
-     1. **完整可运行的代码示例**（至少 20 行，包含完整上下文）
-     2. **文件结构说明**（如 vite.config.js、App.vue、server.js 等）
-     3. **详细注释**（解释每一段代码的作用）
-     4. **性能优化点说明**（说明代码为何能提升性能）
-     5. **适用场景和注意事项**
-   - **code_examples 数组必须至少包含 5 个代码示例**，建议包含 10-15 个，涵盖：
-     - Vue / React 懒加载完整示例（含路由与 Suspense 逻辑）
-     - Webpack / Vite 构建优化完整配置（含注释与效果说明）
-     - Node.js 图片压缩 pipeline 示例（含批量处理逻辑）
-     - Gzip / Brotli / CDN 缓存策略配置（含 Nginx + Express）
-     - Service Worker 缓存策略与更新逻辑
-     - 前端虚拟滚动、骨架屏、资源预加载完整实现
-     - 其他性能优化相关代码示例
-   - 代码不可简写为"一行"，每个示例必须具备上下文逻辑。
-   - 代码中要包含真实可执行的注释（如：// 优化说明、// 示例效果）。
-   - 每个建议代码块的长度绝对不能少于 20 行，内容必须结构完整。
-   - **根据检测到的性能问题，生成对应的、有针对性的代码示例**，不要生成无关的示例。
+JSON 格式检查清单（生成前请确认）：
+✓ 所有字符串值都用双引号包裹
+✓ 没有缺失的引号
+✓ 没有占位符字段
+✓ 没有 Markdown 语法
+✓ 所有字段都已填充实际内容
+✓ JSON 可以被 JSON.parse() 正常解析
 
-
-5. **量化收益预测**：
-   - 基于问题严重度和优化建议，预测具体的性能提升
-   - 使用具体数值（如：LCP 从 3.7s 降至 2.1s，提升 43%）
-
-## 重要提醒：
-
-- **必须返回纯 JSON，不要包含代码块标记**
-- **所有字段必须填充，不要留空**
-- **suggestions 数组必须至少包含 5 个优化建议**，每个建议包含完整的代码示例（至少 20 行）
-- **code_examples 数组必须至少包含 5 个代码示例**，建议包含 10-15 个不同类型示例
-- 代码示例要完整、可执行，包含详细注释和说明
-- 根据检测到的性能问题，生成有针对性的建议和代码示例
-- JSON 必须是有效的，可以直接被 JSON.parse() 解析
-- 所有文本必须使用中文
-
-## 数量要求（必须严格遵守）：
-
-1. **suggestions 数组**：最少 5 个，建议 5-10 个
-   - 每个建议必须包含完整的代码示例（至少 20 行）
-   - 涵盖不同的优化类别（前端、网络、构建、图片、交互等）
-
-2. **code_examples 数组**：最少 5 个，建议 10-15 个
-   - 每个示例必须完整、可执行
-   - 涵盖不同的技术栈和场景
-   - 包含详细的注释和说明
-
-现在请分析提供的 Lighthouse 数据，生成完整的性能优化报告。确保 suggestions 和 code_examples 数组都包含足够的元素。`;
+现在请依据提供的 Lighthouse 数据生成完整报告并返回上述 JSON。`;
 
 /**
- * 调用 DDAI 接口，传入用户输入，返回模型结果
+ * 调用 DeepSeek API 接口，传入用户输入，返回模型结果
  * @param {string} userContent - 用户输入内容
  * @returns {Promise<string>} - 模型返回的内容
  */
-async function callDdaiApi(userContent) {
-  const payload = {
-    top_p: 0.0,
-    frequency_penalty: 0.3,
-    stop: [],
-    max_tokens: 8000, // 增加 token 限制以支持更详细的分析和更多代码示例
-    stream: false,
-    presence_penalty: 0.0,
-    temperature: 0.7,
-    messages: [
-      {
-        content: SYSTEM_PROMPT,
-        role: "system",
-      },
-      {
-        content: userContent,
-        role: "user",
-      },
-    ],
-  };
+async function callDeepSeekApi(userContent) {
+  if (!DEEPSEEK_API_KEY) {
+    throw new Error(
+      "DEEPSEEK_API_KEY 未配置，请在环境变量中设置 DEEPSEEK_API_KEY"
+    );
+  }
 
-  // 将 payload 写入临时文件（避免 shell 转义问题）
-  const tempFile = path.join(__dirname, `temp_payload_${Date.now()}.json`);
-  await fs.writeFile(tempFile, JSON.stringify(payload, null, 2));
+  // 创建 AbortController 用于超时控制
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 300000); // 300秒超时
 
   try {
-    // 构建 curl 命令（使用数组格式以避免 shell 转义问题）
-    const curlArgs = [
-      "curl",
-      "--location",
-      "--silent",
-      "--show-error",
-      DDAI_URL,
-      "--header",
-      "Content-Type: application/json",
-      "--header",
-      `G-Auth-Appid: ${DDAI_APP_ID}`,
-      "--header",
-      `Xi-Mix: ${DDAI_MIX}`,
-      "--header",
-      `Xi-Mix-Model: ${DDAI_MODEL}`,
-      "--header",
-      `Xi-Mode: ${DDAI_MODE}`,
-      "--data",
-      `@${tempFile}`, // 从文件读取数据
-      "--max-time",
-      "60", // 60秒超时
-    ];
+    const payload = {
+      model: DEEPSEEK_MODEL,
+      messages: [
+        {
+          role: "system",
+          content: SYSTEM_PROMPT,
+        },
+        {
+          role: "user",
+          content: userContent,
+        },
+      ],
+      temperature: 0.7,
+      max_tokens: 8000,
+      top_p: 1.0,
+      frequency_penalty: 0.3,
+      presence_penalty: 0.0,
+      stream: false,
+    };
 
-    // 执行 curl 命令
-    const { stdout, stderr } = await execAsync(curlArgs.join(" "), {
-      timeout: 65000, // 65秒超时（略大于 curl 的 60 秒）
-      maxBuffer: 10 * 1024 * 1024, // 10MB 缓冲区
-      shell: true, // 使用 shell 执行
+    const response = await fetch(DEEPSEEK_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
     });
 
-    // curl 的 stderr 可能包含进度信息，只有在出现错误时才警告
-    if (stderr && !stderr.match(/^(%|curl:)/)) {
-      console.warn("Curl stderr:", stderr);
+    clearTimeout(timeoutId);
+
+    // 检查响应状态
+    if (!response.ok) {
+      let errorMessage = `DeepSeek API 请求失败: ${response.status} ${response.statusText}`;
+      try {
+        const errorData = await response.json();
+        if (errorData.error?.message) {
+          errorMessage = errorData.error.message;
+        }
+      } catch (e) {
+        // 如果无法解析错误响应，使用默认错误消息
+      }
+      throw new Error(errorMessage);
     }
 
-    // 解析响应
-    const responseData = JSON.parse(stdout);
+    const data = await response.json();
 
     // 提取AI生成的内容
-    if (responseData.choices && responseData.choices.length > 0) {
-      const choice = responseData.choices[0];
+    if (data.choices && data.choices.length > 0) {
+      const choice = data.choices[0];
       if (choice.message && choice.message.content) {
+        console.log(
+          "🐶🐶🐶choice.message.content>>>",
+          choice.message.content.trim()
+        );
         return choice.message.content.trim();
-      } else if (choice.text) {
-        return choice.text.trim();
       }
     }
 
-    throw new Error("No valid response from DDAI API");
+    throw new Error("No valid response from DeepSeek API");
   } catch (error) {
-    console.error("DDAI API Error:", error.message);
-    if (error.stdout) {
-      console.error("Response:", error.stdout);
+    clearTimeout(timeoutId);
+
+    // 处理 AbortError (超时)
+    if (error.name === "AbortError" || error.message === "terminated") {
+      throw new Error(
+        "DeepSeek API 请求超时。生成的内容可能过长，请稍后重试或减少 max_tokens 参数。"
+      );
     }
+
+    console.error("DeepSeek API Error:", error.message);
+    if (error.status) {
+      console.error("API Status:", error.status);
+    }
+    if (error.code) {
+      console.error("Error Code:", error.code);
+    }
+
+    // 处理其他错误
+    if (error.message) {
+      throw new Error(`DeepSeek API 错误: ${error.message}`);
+    }
+
     throw error;
-  } finally {
-    // 清理临时文件
-    try {
-      await fs.unlink(tempFile);
-    } catch (e) {
-      // 忽略清理错误
-    }
   }
 }
 
@@ -479,14 +289,13 @@ ${Object.values(lighthouseResult.audits)
 
 请提供全面的分析，包括：
 1. **【最重要】系统性的性能分析报告（summary）**：
-   - **必须使用 Markdown 格式**，支持换行（\\n）、加粗（**文本**）、无序列表（- 或 *）等
+   - **格式要求**：使用纯文本格式，使用换行符（\\n）分隔段落，不要使用任何 Markdown 语法
    - **字数要求**：不少于 80 字，建议 100-200 字
    - **必须包含以下四个部分**，每个部分都要详细说明：
-     * **性能状态概述**：当前性能评分、整体性能状况（1-2句话，说明当前状态）
-     * **主要性能问题列表**：至少列出 3-5 个具体问题，使用列表格式（- 或 *），每个问题要具体明确，要基于上面的 Lighthouse 数据分析
-     * **对用户体验的影响**：详细说明每个问题如何影响用户（如：加载时间延长、交互延迟、视觉体验差、首屏内容显示慢等）
-     * **修复后的预期收益**：量化说明修复后的性能提升（如：LCP 可降低 30%，首屏时间减少 1.5 秒，TBT 降低 40%，性能评分提升至 85 分等）
-   - **格式要求**：使用加粗标题（**性能状态概述**、**主要性能问题**、**用户体验影响**、**修复后收益**）来组织内容，确保有换行和清晰的段落分隔
+     * 性能状态概述：当前性能评分、整体性能状况（1-2句话，说明当前状态）
+     * 主要性能问题列表：至少列出 3-5 个具体问题，每个问题要具体明确，要基于上面的 Lighthouse 数据分析
+     * 对用户体验的影响：详细说明每个问题如何影响用户（如：加载时间延长、交互延迟、视觉体验差、首屏内容显示慢等）
+     * 修复后的预期收益：量化说明修复后的性能提升（如：LCP 可降低 30%，首屏时间减少 1.5 秒，TBT 降低 40%，性能评分提升至 85 分等）
    - **内容要求**：系统、专业、可读性强，要基于上面提供的 Lighthouse 数据进行分析，不能泛泛而谈，每个问题都要有数据支撑
 2. 识别具体性能瓶颈（网络/渲染/JS膨胀/图片/第三方脚本等）
 3. 生成具体的优化建议和代码示例
@@ -499,27 +308,302 @@ ${Object.values(lighthouseResult.audits)
 
 请仅以有效的 JSON 格式返回响应，所有文本内容必须使用中文。`;
 
+  // JSON 清理和修复函数
+  function cleanJsonString(jsonString) {
+    let cleaned = jsonString.trim();
+
+    // 移除 Markdown 代码块标记（```json、```JSON、```）
+    cleaned = cleaned
+      .replace(/^```(?:json|JSON)?\s*\n?/i, "") // 移除开头的 ```json 或 ```
+      .replace(/\n?```\s*$/i, "") // 移除结尾的 ```
+      .trim();
+
+    // 如果还有代码块标记（可能在中间），尝试移除
+    if (cleaned.includes("```")) {
+      // 只移除独立的代码块标记行（整行只有 ``` 或 ```json）
+      cleaned = cleaned
+        .split("\n")
+        .filter((line) => !/^```(?:json|JSON)?\s*$/i.test(line.trim()))
+        .join("\n");
+    }
+
+    // 移除 JSON 注释（单行和多行）
+    cleaned = cleaned
+      .replace(/\/\/.*$/gm, "") // 移除单行注释
+      .replace(/\/\*[\s\S]*?\*\//g, ""); // 移除多行注释
+
+    // 尝试提取第一个完整的 JSON 对象
+    const firstBrace = cleaned.indexOf("{");
+    if (firstBrace !== -1) {
+      let braceCount = 0;
+      let inString = false;
+      let escapeNext = false;
+      let endIndex = firstBrace;
+
+      for (let i = firstBrace; i < cleaned.length; i++) {
+        const char = cleaned[i];
+
+        if (escapeNext) {
+          escapeNext = false;
+          continue;
+        }
+
+        if (char === "\\") {
+          escapeNext = true;
+          continue;
+        }
+
+        if (char === '"') {
+          inString = !inString;
+          continue;
+        }
+
+        if (!inString) {
+          if (char === "{") {
+            braceCount++;
+          } else if (char === "}") {
+            braceCount--;
+            if (braceCount === 0) {
+              endIndex = i + 1;
+              break;
+            }
+          }
+        }
+      }
+
+      if (braceCount === 0) {
+        cleaned = cleaned.substring(firstBrace, endIndex);
+      }
+    }
+
+    // 移除末尾多余的逗号（在对象和数组的最后一个元素后）
+    cleaned = cleaned
+      .replace(/,(\s*[}\]])/g, "$1") // 移除对象和数组末尾的逗号
+      .trim();
+
+    return cleaned;
+  }
+
   try {
-    const content = await callDdaiApi(prompt);
+    const content = await callDeepSeekApi(prompt);
 
     if (!content) {
-      throw new Error("No response from DDAI API");
+      throw new Error("No response from DeepSeek API");
     }
 
-    // 尝试解析 JSON，如果内容被代码块包裹，提取 JSON 部分
-    let jsonContent = content;
+    // 清理和修复 JSON 字符串
+    let jsonContent = cleanJsonString(content);
 
-    // 移除可能的 markdown 代码块标记
-    if (jsonContent.includes("```json")) {
+    // 尝试解析 JSON，如果失败则尝试更激进的修复
+    let analysis;
+    try {
+      analysis = JSON.parse(jsonContent);
+    } catch (parseError) {
+      console.error("First JSON parse attempt failed:", parseError.message);
+
+      // 显示错误位置附近的内容以便调试
+      if (parseError.message.includes("position")) {
+        const match = parseError.message.match(/position (\d+)/);
+        if (match) {
+          const pos = parseInt(match[1]);
+          const start = Math.max(0, pos - 100);
+          const end = Math.min(jsonContent.length, pos + 100);
+          console.error(
+            `Error at position ${pos}, context:`,
+            jsonContent.substring(start, end)
+          );
+        }
+      }
+
+      // 尝试更激进的修复：移除 Markdown 代码块标记和所有注释行
       jsonContent = jsonContent
-        .replace(/```json\n?/g, "")
-        .replace(/```\n?/g, "");
-    } else if (jsonContent.includes("```")) {
-      jsonContent = jsonContent.replace(/```\n?/g, "");
-    }
+        .replace(/^```(?:json|JSON)?\s*\n?/i, "") // 移除开头的 ```json 或 ```
+        .replace(/\n?```\s*$/i, "") // 移除结尾的 ```
+        .trim();
 
-    // 尝试解析 JSON
-    let analysis = JSON.parse(jsonContent.trim());
+      // 移除所有注释行和多余的空行
+      jsonContent = jsonContent
+        .split("\n")
+        .filter((line) => {
+          const trimmed = line.trim();
+          return (
+            trimmed &&
+            !trimmed.startsWith("//") &&
+            !trimmed.startsWith("/*") &&
+            !trimmed.startsWith("*") &&
+            !trimmed.startsWith("```") // 也移除可能的代码块标记行
+          );
+        })
+        .join("\n");
+
+      // 尝试修复常见的 JSON 问题
+      // 1. 尝试提取完整的 JSON 对象（如果响应被截断）
+      // 通过找到最后一个匹配的 } 来提取完整的 JSON
+      try {
+        let braceCount = 0;
+        let inString = false;
+        let escapeNext = false;
+        let lastValidBrace = -1;
+
+        for (let i = 0; i < jsonContent.length; i++) {
+          const char = jsonContent[i];
+
+          if (escapeNext) {
+            escapeNext = false;
+            continue;
+          }
+
+          if (char === "\\") {
+            escapeNext = true;
+            continue;
+          }
+
+          if (char === '"') {
+            inString = !inString;
+            continue;
+          }
+
+          if (!inString) {
+            if (char === "{") {
+              braceCount++;
+            } else if (char === "}") {
+              braceCount--;
+              if (braceCount === 0) {
+                lastValidBrace = i;
+              }
+            }
+          }
+        }
+
+        // 如果找到了完整的 JSON 对象，且 JSON 可能被截断
+        if (lastValidBrace !== -1 && lastValidBrace < jsonContent.length - 10) {
+          const potentialJson = jsonContent.substring(0, lastValidBrace + 1);
+          try {
+            const testParse = JSON.parse(potentialJson);
+            jsonContent = potentialJson;
+            console.log("Successfully extracted complete JSON from response");
+          } catch (e) {
+            // 如果截断后的 JSON 仍然无效，继续使用原始内容
+          }
+        }
+      } catch (e) {
+        // 如果提取失败，继续尝试其他修复
+      }
+
+      // 尝试修复常见的 JSON 语法错误
+      // 1. 先修复不完整的对象（移除空字段或缺失键名的字段）
+      // 移除类似 "title": "", "", "" 这样的无效字段（没有键名的空字符串）
+      jsonContent = jsonContent.replace(/,\s*"",\s*""/g, "");
+      jsonContent = jsonContent.replace(/,\s*""/g, "");
+      jsonContent = jsonContent.replace(/""\s*,/g, "");
+
+      // 移除不完整的对象（只有空字段或缺失键名的对象）
+      // 匹配类似 {"type": "render", "title": "", "", "", ""} 的情况
+      jsonContent = jsonContent.replace(
+        /,\s*\{\s*"type"\s*:\s*"[^"]*"\s*,\s*"title"\s*:\s*"",\s*"",\s*"",\s*""\s*\}/g,
+        ""
+      );
+      jsonContent = jsonContent.replace(
+        /\{\s*"type"\s*:\s*"[^"]*"\s*,\s*"title"\s*:\s*"",\s*"",\s*"",\s*""\s*\}/g,
+        ""
+      );
+
+      // 移除只包含空字段的对象（更通用的情况）
+      jsonContent = jsonContent.replace(
+        /,\s*\{\s*"[^"]*"\s*:\s*"[^"]*"\s*,\s*"[^"]*"\s*:\s*"",\s*"",\s*"",\s*""\s*\}/g,
+        ""
+      );
+      jsonContent = jsonContent.replace(
+        /\{\s*"[^"]*"\s*:\s*"[^"]*"\s*,\s*"[^"]*"\s*:\s*"",\s*"",\s*"",\s*""\s*\}/g,
+        ""
+      );
+
+      // 2. 修复缺失开头引号的字符串值（更精确的匹配）
+      // 只匹配明显的缺失引号情况：": 后面直接跟着字母或中文字符（非引号、非数字、非布尔值）
+      // 使用更保守的正则，只匹配明显的字符串值（以字母、中文、常见符号开头）
+      jsonContent = jsonContent.replace(
+        /":\s*([a-zA-Z\u4e00-\u9fa5][^"]*?)"/g,
+        (match, value) => {
+          const trimmed = value.trim();
+          // 再次检查确保不是数字、布尔值、null或数组/对象
+          if (
+            trimmed.length > 0 &&
+            !trimmed.startsWith('"') &&
+            !trimmed.startsWith("[") &&
+            !trimmed.startsWith("{") &&
+            !/^(true|false|null|-?\d+\.?\d*)$/.test(trimmed)
+          ) {
+            // 转义值中的特殊字符
+            const escaped = trimmed
+              .replace(/\\/g, "\\\\")
+              .replace(/"/g, '\\"')
+              .replace(/\n/g, "\\n")
+              .replace(/\r/g, "\\r")
+              .replace(/\t/g, "\\t");
+            return `": "${escaped}"`;
+          }
+          return match;
+        }
+      );
+
+      // 3. 移除占位符字段（包含_insights_、_placeholder_、_comment_等占位符的字段）
+      // 先移除字段定义（包括前面的逗号）
+      jsonContent = jsonContent.replace(
+        /,\s*"[^"]*_(?:insights_|placeholder_|comment_)[^"]*"\s*:[^,}]*/gi,
+        ""
+      );
+      // 再移除字段定义（包括后面的逗号）
+      jsonContent = jsonContent.replace(
+        /"[^"]*_(?:insights_|placeholder_|comment_)[^"]*"\s*:[^,}]*,?/gi,
+        ""
+      );
+      // 移除包含大量下划线和占位符文本的字段
+      jsonContent = jsonContent.replace(/,\s*"[^"]*_{3,}[^"]*"\s*:[^,}]*/g, "");
+
+      // 3. 清理多余的逗号
+      jsonContent = jsonContent
+        .replace(/,(\s*[}\]])/g, "$1") // 移除末尾逗号
+        .replace(/,(\s*,)/g, ",") // 移除重复逗号
+        .trim();
+
+      try {
+        analysis = JSON.parse(jsonContent);
+      } catch (secondError) {
+        console.error("Second JSON parse attempt failed:", secondError.message);
+
+        // 显示更详细的错误信息
+        if (secondError.message.includes("position")) {
+          const match = secondError.message.match(/position (\d+)/);
+          if (match) {
+            const pos = parseInt(match[1]);
+            const start = Math.max(0, pos - 100);
+            const end = Math.min(jsonContent.length, pos + 100);
+            console.error(
+              `Error at position ${pos}, context:`,
+              jsonContent.substring(start, end)
+            );
+            console.error(
+              `JSON length: ${jsonContent.length}, error position: ${pos}`
+            );
+          }
+        }
+
+        console.error(
+          "JSON content (first 1000 chars):",
+          jsonContent.substring(0, 1000)
+        );
+        console.error(
+          "JSON content (last 500 chars):",
+          jsonContent.substring(Math.max(0, jsonContent.length - 500))
+        );
+
+        throw new Error(
+          `无法解析 AI 返回的 JSON 格式: ${
+            secondError.message
+          }。原始内容前500字符: ${content.substring(0, 500)}`
+        );
+      }
+    }
 
     // 确保所有必需字段都存在，如果缺失则使用默认值
     analysis = {
