@@ -43,6 +43,8 @@ router.post("/", async (req, res) => {
       aiAnalysis,
     };
 
+    console.log("server response>>>", response);
+
     // Save to local file (optional)
     const fs = await import("fs/promises");
     const reportsDir = "./reports";

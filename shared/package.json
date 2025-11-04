@@ -1,8 +1,0 @@
-{
-  "name": "@ai-webperf-doctor/shared",
-  "version": "1.0.0",
-  "main": "./src/index.js",
-  "scripts": {
-    "build": "echo 'No build needed for JS'"
-  }
-}
