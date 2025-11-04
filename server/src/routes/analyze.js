@@ -9,7 +9,7 @@ router.post("/", async (req, res) => {
     console.log("Received request body:", JSON.stringify(req.body));
     console.log("Content-Type:", req.headers["content-type"]);
 
-    const { url } = req.body;
+    let { url } = req.body;
 
     console.log("request>>>", url);
 
@@ -21,12 +21,24 @@ router.post("/", async (req, res) => {
       });
     }
 
+    // 规范化 URL：自动补全协议
+    url = url.trim();
+    if (!/^https?:\/\//i.test(url)) {
+      // 如果没有协议，添加 https://
+      url = `https://${url}`;
+      console.log("Normalized URL:", url);
+    }
+
     // Validate URL
+    let validatedUrl;
     try {
-      new URL(url);
+      validatedUrl = new URL(url);
     } catch {
       return res.status(400).json({ error: "无效的 URL 格式" });
     }
+
+    // 确保使用规范化后的 URL
+    url = validatedUrl.href;
 
     console.log(`🔍 Analyzing: ${url}`);
 
@@ -44,6 +56,8 @@ router.post("/", async (req, res) => {
     };
 
     console.log("server response>>>", response);
+
+    console.log("aiAnalysis>>>", JSON.stringify(aiAnalysis, null, 2));
 
     // Save to local file (optional)
     const fs = await import("fs/promises");

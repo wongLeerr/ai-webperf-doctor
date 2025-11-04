@@ -17,7 +17,7 @@
           <input
             v-model="url"
             type="text"
-            placeholder="请输入网站 URL（例如：https://example.com）"
+            placeholder="请输入网站 URL（例如：dedao.cn、www.dedao.cn 或 https://www.dedao.cn）"
             class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
             @keyup.enter="analyze"
             :disabled="loading"
@@ -47,20 +47,37 @@
           <h2 class="text-2xl font-bold mb-4">性能评分</h2>
           <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div class="text-center">
-              <div class="text-3xl font-bold" :class="getScoreColor(results.lighthouse.scores?.performance || results.lighthouse.score)">
-                {{ results.lighthouse.scores?.performance || results.lighthouse.score }}
+              <div
+                class="text-3xl font-bold"
+                :class="
+                  getScoreColor(
+                    results.lighthouse.scores?.performance ||
+                      results.lighthouse.score
+                  )
+                "
+              >
+                {{
+                  results.lighthouse.scores?.performance ||
+                  results.lighthouse.score
+                }}
               </div>
               <div class="text-gray-500 text-sm">性能</div>
             </div>
-            <div v-if="results.lighthouse.scores?.accessibility" class="text-center">
+            <div
+              v-if="results.lighthouse.scores?.accessibility"
+              class="text-center"
+            >
               <div class="text-3xl font-bold text-blue-600">
                 {{ results.lighthouse.scores.accessibility }}
               </div>
               <div class="text-gray-500 text-sm">可访问性</div>
             </div>
-            <div v-if="results.lighthouse.scores?.['best-practices']" class="text-center">
+            <div
+              v-if="results.lighthouse.scores?.['best-practices']"
+              class="text-center"
+            >
               <div class="text-3xl font-bold text-purple-600">
-                {{ results.lighthouse.scores['best-practices'] }}
+                {{ results.lighthouse.scores["best-practices"] }}
               </div>
               <div class="text-gray-500 text-sm">最佳实践</div>
             </div>
@@ -74,17 +91,112 @@
         </div>
 
         <!-- AI Analysis Summary -->
-        <div class="bg-white rounded-lg shadow-lg p-6">
-          <h2 class="text-2xl font-bold mb-4">🤖 AI 分析摘要</h2>
-          <p class="text-gray-700 leading-relaxed text-lg">
-            {{ results.aiAnalysis.summary }}
-          </p>
-          <div v-if="results.aiAnalysis.prediction" class="mt-4 p-4 bg-blue-50 rounded-lg">
-            <p class="text-blue-800">
-              <strong>性能预测：</strong>{{ results.aiAnalysis.prediction }}
-            </p>
+        <div
+          class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg shadow-lg p-6 border border-blue-200"
+        >
+          <h2
+            class="text-2xl font-bold mb-4 text-gray-800 flex items-center gap-2"
+          >
+            <span>🤖</span> AI 分析摘要
+          </h2>
+          <div
+            class="text-gray-700 leading-relaxed text-base mb-4 bg-white p-6 rounded-lg border-l-4 border-blue-500"
+          >
+            <MarkdownText :text="results.aiAnalysis.summary" />
+          </div>
+          <div
+            v-if="results.aiAnalysis.prediction"
+            class="p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200"
+          >
+            <div class="flex items-start gap-2">
+              <span class="text-2xl">📈</span>
+              <div>
+                <p class="text-sm font-semibold text-green-700 mb-1">
+                  性能预测
+                </p>
+                <p class="text-gray-800">{{ results.aiAnalysis.prediction }}</p>
+              </div>
+            </div>
           </div>
         </div>
+
+        <!-- AI Score Details -->
+        <div
+          v-if="results.aiAnalysis.score"
+          class="bg-white rounded-lg shadow-lg p-6"
+        >
+          <h2 class="text-2xl font-bold mb-4 text-gray-800">AI 评分详情</h2>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div
+              class="text-center p-4 rounded-lg"
+              :class="getScoreBgColor(results.aiAnalysis.score.performance)"
+            >
+              <div
+                class="text-4xl font-bold mb-2"
+                :class="getScoreTextColor(results.aiAnalysis.score.performance)"
+              >
+                {{ results.aiAnalysis.score.performance }}
+              </div>
+              <div class="text-sm font-semibold text-gray-700">性能</div>
+              <div class="text-xs text-gray-500 mt-1">Performance</div>
+            </div>
+            <div
+              class="text-center p-4 rounded-lg"
+              :class="getScoreBgColor(results.aiAnalysis.score.accessibility)"
+            >
+              <div
+                class="text-4xl font-bold mb-2"
+                :class="
+                  getScoreTextColor(results.aiAnalysis.score.accessibility)
+                "
+              >
+                {{ results.aiAnalysis.score.accessibility }}
+              </div>
+              <div class="text-sm font-semibold text-gray-700">可访问性</div>
+              <div class="text-xs text-gray-500 mt-1">Accessibility</div>
+            </div>
+            <div
+              class="text-center p-4 rounded-lg"
+              :class="getScoreBgColor(results.aiAnalysis.score.bestPractices)"
+            >
+              <div
+                class="text-4xl font-bold mb-2"
+                :class="
+                  getScoreTextColor(results.aiAnalysis.score.bestPractices)
+                "
+              >
+                {{ results.aiAnalysis.score.bestPractices }}
+              </div>
+              <div class="text-sm font-semibold text-gray-700">最佳实践</div>
+              <div class="text-xs text-gray-500 mt-1">Best Practices</div>
+            </div>
+            <div
+              class="text-center p-4 rounded-lg"
+              :class="getScoreBgColor(results.aiAnalysis.score.seo)"
+            >
+              <div
+                class="text-4xl font-bold mb-2"
+                :class="getScoreTextColor(results.aiAnalysis.score.seo)"
+              >
+                {{ results.aiAnalysis.score.seo }}
+              </div>
+              <div class="text-sm font-semibold text-gray-700">SEO</div>
+              <div class="text-xs text-gray-500 mt-1">Search Engine</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- AI Metrics Detail -->
+        <MetricsDetailCard
+          v-if="results.aiAnalysis.metrics"
+          :metrics="results.aiAnalysis.metrics"
+        />
+
+        <!-- AI Insights -->
+        <AIInsightsCard
+          v-if="results.aiAnalysis.ai_insights"
+          :insights="results.aiAnalysis.ai_insights"
+        />
 
         <!-- Radar Chart - Core Web Vitals -->
         <div class="bg-white rounded-lg shadow-lg p-6">
@@ -137,19 +249,27 @@
               <div class="grid grid-cols-2 gap-4">
                 <div class="p-3 bg-blue-50 rounded">
                   <div class="text-xs text-gray-600">JavaScript</div>
-                  <div class="text-lg font-semibold">{{ results.lighthouse.resources?.jsTotalSize || 0 }} KB</div>
+                  <div class="text-lg font-semibold">
+                    {{ results.lighthouse.resources?.jsTotalSize || 0 }} KB
+                  </div>
                 </div>
                 <div class="p-3 bg-green-50 rounded">
                   <div class="text-xs text-gray-600">CSS</div>
-                  <div class="text-lg font-semibold">{{ results.lighthouse.resources?.cssTotalSize || 0 }} KB</div>
+                  <div class="text-lg font-semibold">
+                    {{ results.lighthouse.resources?.cssTotalSize || 0 }} KB
+                  </div>
                 </div>
                 <div class="p-3 bg-yellow-50 rounded">
                   <div class="text-xs text-gray-600">图片</div>
-                  <div class="text-lg font-semibold">{{ results.lighthouse.resources?.imageTotalSize || 0 }} KB</div>
+                  <div class="text-lg font-semibold">
+                    {{ results.lighthouse.resources?.imageTotalSize || 0 }} KB
+                  </div>
                 </div>
                 <div class="p-3 bg-purple-50 rounded">
                   <div class="text-xs text-gray-600">第三方</div>
-                  <div class="text-lg font-semibold">{{ results.lighthouse.resources?.thirdPartySize || 0 }} KB</div>
+                  <div class="text-lg font-semibold">
+                    {{ results.lighthouse.resources?.thirdPartySize || 0 }} KB
+                  </div>
                 </div>
               </div>
             </div>
@@ -162,20 +282,28 @@
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <div class="p-4 bg-gray-50 rounded-lg">
               <div class="text-sm text-gray-600 mb-1">总请求数</div>
-              <div class="text-3xl font-bold">{{ results.lighthouse.requests?.total || 0 }}</div>
+              <div class="text-3xl font-bold">
+                {{ results.lighthouse.requests?.total || 0 }}
+              </div>
             </div>
             <div class="p-4 bg-orange-50 rounded-lg">
               <div class="text-sm text-gray-600 mb-1">第三方请求</div>
-              <div class="text-3xl font-bold">{{ results.lighthouse.requests?.thirdParty || 0 }}</div>
+              <div class="text-3xl font-bold">
+                {{ results.lighthouse.requests?.thirdParty || 0 }}
+              </div>
             </div>
             <div class="p-4 bg-blue-50 rounded-lg">
               <div class="text-sm text-gray-600 mb-1">第三方占比</div>
-              <div class="text-3xl font-bold">{{ results.lighthouse.requests?.thirdPartyRatio || 0 }}%</div>
+              <div class="text-3xl font-bold">
+                {{ results.lighthouse.requests?.thirdPartyRatio || 0 }}%
+              </div>
             </div>
           </div>
           <div v-if="results.lighthouse.requests?.slowRequests?.length > 0">
             <h3 class="text-xl font-semibold mb-4">慢请求 Top 10</h3>
-            <BarChart :slowRequests="results.lighthouse.requests.slowRequests" />
+            <BarChart
+              :slowRequests="results.lighthouse.requests.slowRequests"
+            />
           </div>
         </div>
 
@@ -186,13 +314,19 @@
         </div>
 
         <!-- Waterfall Timeline -->
-        <div v-if="results.lighthouse.timeline?.length > 0" class="bg-white rounded-lg shadow-lg p-6">
+        <div
+          v-if="results.lighthouse.timeline?.length > 0"
+          class="bg-white rounded-lg shadow-lg p-6"
+        >
           <h2 class="text-2xl font-bold mb-4">资源加载时间线（瀑布流）</h2>
           <WaterfallChart :timeline="results.lighthouse.timeline" />
         </div>
 
         <!-- Performance Problems -->
-        <div v-if="results.aiAnalysis.problems?.length > 0" class="bg-white rounded-lg shadow-lg p-6">
+        <div
+          v-if="results.aiAnalysis.problems?.length > 0"
+          class="bg-white rounded-lg shadow-lg p-6"
+        >
           <h2 class="text-2xl font-bold mb-4">性能瓶颈识别</h2>
           <div class="space-y-4">
             <ProblemCard
@@ -204,14 +338,97 @@
         </div>
 
         <!-- Optimization Suggestions -->
-        <div v-if="results.aiAnalysis.suggestions?.length > 0" class="bg-white rounded-lg shadow-lg p-6">
-          <h2 class="text-2xl font-bold mb-4">优化建议与代码示例</h2>
+        <div
+          v-if="results.aiAnalysis.suggestions?.length > 0"
+          class="bg-white rounded-lg shadow-lg p-6"
+        >
+          <h2 class="text-2xl font-bold mb-4 text-gray-800">
+            AI 优化建议与代码示例
+          </h2>
           <div class="space-y-4">
             <SuggestionCard
               v-for="(suggestion, index) in results.aiAnalysis.suggestions"
               :key="index"
               :suggestion="suggestion"
             />
+          </div>
+        </div>
+
+        <!-- Code Examples Collection -->
+        <div
+          v-if="results.aiAnalysis.code_examples?.length > 0"
+          class="bg-white rounded-lg shadow-lg p-6"
+        >
+          <h2 class="text-2xl font-bold mb-4 text-gray-800">💻 代码示例库</h2>
+          <p class="text-gray-600 mb-4 text-sm">
+            以下代码示例可直接复制使用，涵盖多种优化场景
+          </p>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <CodeExampleCard
+              v-for="(example, index) in results.aiAnalysis.code_examples"
+              :key="index"
+              :example="example"
+            />
+          </div>
+        </div>
+
+        <!-- Visualization Data -->
+        <div v-if="results.aiAnalysis.visualization" class="space-y-6">
+          <!-- Metric Trends Chart -->
+          <div
+            v-if="
+              results.aiAnalysis.visualization.chartData?.metricTrends?.length >
+              0
+            "
+            class="bg-white rounded-lg shadow-lg p-6"
+          >
+            <h2 class="text-2xl font-bold mb-4 text-gray-800">
+              📊 性能趋势预测
+            </h2>
+            <p class="text-gray-600 mb-4 text-sm">展示优化前后的性能指标对比</p>
+            <MetricTrendChart
+              :trends="results.aiAnalysis.visualization.chartData.metricTrends"
+            />
+          </div>
+
+          <!-- Bottleneck Distribution -->
+          <div
+            v-if="
+              results.aiAnalysis.visualization.chartData?.bottleneckDistribution
+            "
+            class="bg-white rounded-lg shadow-lg p-6"
+          >
+            <h2 class="text-2xl font-bold mb-4 text-gray-800">
+              🎯 性能瓶颈分布
+            </h2>
+            <p class="text-gray-600 mb-4 text-sm">AI 分析的各类型瓶颈占比</p>
+            <BottleneckChart
+              :distribution="
+                results.aiAnalysis.visualization.chartData
+                  .bottleneckDistribution
+              "
+            />
+          </div>
+
+          <!-- AI Cards -->
+          <div
+            v-if="results.aiAnalysis.visualization.aiCards?.length > 0"
+            class="bg-white rounded-lg shadow-lg p-6"
+          >
+            <h2 class="text-2xl font-bold mb-4 text-gray-800">
+              🎴 AI 智能卡片
+            </h2>
+            <p class="text-gray-600 mb-4 text-sm">
+              AI 基于数据生成的智能洞察卡片
+            </p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <AICard
+                v-for="(card, index) in results.aiAnalysis.visualization
+                  .aiCards"
+                :key="index"
+                :card="card"
+              />
+            </div>
           </div>
         </div>
 
@@ -233,18 +450,49 @@
 import { ref, computed } from "vue";
 import { use } from "echarts/core";
 import { CanvasRenderer } from "echarts/renderers";
+import {
+  BarChart as EChartsBarChart,
+  PieChart as EChartsPieChart,
+  LineChart as EChartsLineChart,
+  RadarChart as EChartsRadarChart,
+} from "echarts/charts";
+import {
+  TitleComponent,
+  TooltipComponent,
+  LegendComponent,
+  GridComponent,
+  RadarComponent,
+} from "echarts/components";
 import VChart from "vue-echarts";
 import axios from "axios";
 import MetricCard from "./components/MetricCard.vue";
 import ProblemCard from "./components/ProblemCard.vue";
 import SuggestionCard from "./components/SuggestionCard.vue";
+import AIInsightsCard from "./components/AIInsightsCard.vue";
+import MetricsDetailCard from "./components/MetricsDetailCard.vue";
+import CodeExampleCard from "./components/CodeExampleCard.vue";
+import AICard from "./components/AICard.vue";
+import MarkdownText from "./components/MarkdownText.vue";
 import RadarChart from "./components/Charts/RadarChart.vue";
 import PieChart from "./components/Charts/PieChart.vue";
 import BarChart from "./components/Charts/BarChart.vue";
 import LineChart from "./components/Charts/LineChart.vue";
 import WaterfallChart from "./components/Charts/WaterfallChart.vue";
+import MetricTrendChart from "./components/Charts/MetricTrendChart.vue";
+import BottleneckChart from "./components/Charts/BottleneckChart.vue";
 
-use([CanvasRenderer]);
+use([
+  CanvasRenderer,
+  EChartsBarChart,
+  EChartsPieChart,
+  EChartsLineChart,
+  EChartsRadarChart,
+  TitleComponent,
+  TooltipComponent,
+  LegendComponent,
+  GridComponent,
+  RadarComponent,
+]);
 
 const url = ref("");
 const loading = ref(false);
@@ -256,6 +504,39 @@ function getScoreColor(score) {
   return "text-red-600";
 }
 
+function getScoreBgColor(score) {
+  if (score >= 90) return "bg-green-50 border-2 border-green-200";
+  if (score >= 75) return "bg-blue-50 border-2 border-blue-200";
+  if (score >= 50) return "bg-yellow-50 border-2 border-yellow-200";
+  return "bg-red-50 border-2 border-red-200";
+}
+
+function getScoreTextColor(score) {
+  if (score >= 90) return "text-green-600";
+  if (score >= 75) return "text-blue-600";
+  if (score >= 50) return "text-yellow-600";
+  return "text-red-600";
+}
+
+/**
+ * 规范化 URL，自动补全协议
+ * 支持：dedao.cn, www.dedao.cn, https://www.dedao.cn/
+ */
+function normalizeUrl(inputUrl) {
+  if (!inputUrl) return "";
+
+  // 去除首尾空格
+  let normalized = inputUrl.trim();
+
+  // 如果已经有协议（http:// 或 https://），直接返回
+  if (/^https?:\/\//i.test(normalized)) {
+    return normalized;
+  }
+
+  // 如果没有协议，添加 https://
+  return `https://${normalized}`;
+}
+
 async function analyze() {
   if (!url.value) return;
 
@@ -263,10 +544,13 @@ async function analyze() {
   results.value = null;
 
   try {
+    // 规范化 URL（自动补全协议）
+    const normalizedUrl = normalizeUrl(url.value);
+
     const response = await axios.post(
       "/api/analyze",
       {
-        url: url.value,
+        url: normalizedUrl,
       },
       {
         headers: {
