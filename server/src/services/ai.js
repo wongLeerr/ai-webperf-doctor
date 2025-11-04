@@ -254,7 +254,7 @@ ${Object.values(lighthouseResult.audits)
         bestPractices: 0,
         seo: 0,
       },
-      prediction: "如果执行优化建议，性能评分预计可提升至 85 分以上。",
+      prediction: "如果执行AI提供的优化建议，性能评分预计可提升至 85 分以上。",
     };
   }
 }

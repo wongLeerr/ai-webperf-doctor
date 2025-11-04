@@ -283,35 +283,58 @@ export async function runLighthouse(url) {
     const performanceScore = scores.performance;
 
     // 构建时间线数据（瀑布流）
-    // Lighthouse 的时间单位是毫秒，但可能为 0，需要过滤
-    const timeline = networkRecords
+    // 首先过滤有效记录并计算相对时间
+    const validRecords = networkRecords
       .filter(
         (record) =>
-          record.startTime != null && record.endTime != null && record.url
-      )
+          record.startTime != null && 
+          record.endTime != null && 
+          record.url &&
+          typeof record.startTime === "number" &&
+          typeof record.endTime === "number" &&
+          record.startTime >= 0 &&
+          record.endTime > record.startTime
+      );
+
+    // 找到最早的时间戳作为基准点（页面开始加载时间）
+    const baseTime = validRecords.length > 0 
+      ? Math.min(...validRecords.map(r => r.startTime))
+      : 0;
+
+    // 转换为相对时间（相对于页面开始加载）
+    const timeline = validRecords
       .map((record) => {
         const recordUrl = record.url || "";
         const fileName = recordUrl.split("/").pop() || recordUrl;
-        // Lighthouse 返回的时间已经是毫秒，但需要确保是数字
-        const startTime =
-          typeof record.startTime === "number"
-            ? record.startTime
-            : record.startTime || 0;
-        const endTime =
-          typeof record.endTime === "number"
-            ? record.endTime
-            : record.endTime || 0;
+        
+        // 转换为相对于页面开始的相对时间（毫秒）
+        const relativeStartTime = record.startTime - baseTime;
+        const relativeEndTime = record.endTime - baseTime;
+        
+        // 确定资源类型
+        const mimeType = (record.mimeType || "").toLowerCase();
+        let resourceType = "unknown";
+        if (mimeType.includes("javascript") || recordUrl.endsWith(".js") || recordUrl.includes(".mjs")) {
+          resourceType = "javascript";
+        } else if (mimeType.includes("css") || recordUrl.endsWith(".css")) {
+          resourceType = "css";
+        } else if (mimeType.includes("image")) {
+          resourceType = "image";
+        } else if (mimeType.includes("html") || mimeType.includes("text")) {
+          resourceType = "text";
+        }
+
         return {
-          name: fileName.length > 30 ? fileName.substring(0, 30) : fileName,
+          name: fileName.length > 30 ? fileName.substring(0, 30) + "..." : fileName,
           url: recordUrl,
-          startTime: startTime,
-          endTime: endTime,
-          duration: endTime - startTime,
+          startTime: Math.max(0, relativeStartTime), // 确保不为负数
+          endTime: Math.max(0, relativeEndTime),
+          duration: Math.max(0, relativeEndTime - relativeStartTime),
           size: record.transferSize || 0,
-          type: (record.mimeType || "").split("/")[0] || "unknown",
+          type: resourceType,
         };
       })
-      .filter((item) => item.startTime >= 0 && item.duration > 0)
+      .filter((item) => item.duration > 0) // 确保有有效的持续时间
       .sort((a, b) => a.startTime - b.startTime)
       .slice(0, 50); // 限制数量以提高性能
 
