@@ -1,10 +1,13 @@
 import fetch from "node-fetch";
 
-// DeepSeek API 配置
-const DEEPSEEK_API_KEY =
-  process.env.DEEPSEEK_API_KEY || "sk-9652bb96f61245ba899e23e5f67583fe";
-const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL || "deepseek-reasoner";
-const DEEPSEEK_API_URL = "https://api.deepseek.com/chat/completions";
+// DeepSeek API 配置（延迟读取，确保 dotenv 已加载）
+function getDeepSeekConfig() {
+  return {
+    apiKey: process.env.DEEPSEEK_API_KEY,
+    model: process.env.DEEPSEEK_MODEL || "deepseek-reasoner",
+    apiUrl: "https://api.deepseek.com/chat/completions",
+  };
+}
 
 const SYSTEM_PROMPT = `你是网页性能优化专家。根据Lighthouse数据返回纯JSON格式的性能分析报告。
 
@@ -59,7 +62,9 @@ JSON结构：
 关键：确保JSON完整且可解析，所有字段有值，problems中每个对象必须完整。`;
 
 async function callDeepSeekApi(userContent) {
-  if (!DEEPSEEK_API_KEY) {
+  const config = getDeepSeekConfig();
+
+  if (!config.apiKey) {
     throw new Error(
       "DEEPSEEK_API_KEY 未配置，请在环境变量中设置 DEEPSEEK_API_KEY"
     );
@@ -71,7 +76,7 @@ async function callDeepSeekApi(userContent) {
 
   try {
     const payload = {
-      model: DEEPSEEK_MODEL,
+      model: config.model,
       messages: [
         {
           role: "system",
@@ -92,11 +97,11 @@ async function callDeepSeekApi(userContent) {
 
     console.log("payload>>>", JSON.stringify(payload, null, 2));
 
-    const response = await fetch(DEEPSEEK_API_URL, {
+    const response = await fetch(config.apiUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
+        Authorization: `Bearer ${config.apiKey}`,
       },
       body: JSON.stringify(payload),
       signal: controller.signal,
@@ -124,9 +129,6 @@ async function callDeepSeekApi(userContent) {
     if (data.choices && data.choices.length > 0) {
       const choice = data.choices[0];
       if (choice.message && choice.message.content) {
-        console.log("🐶🐶🐶choice.message.content start>>>");
-        console.log(choice.message.content.trim());
-        console.log("🐶🐶🐶choice.message.content end");
         return choice.message.content.trim();
       }
     }
@@ -204,9 +206,6 @@ ${Object.values(lighthouseResult.audits)
   .join("\n")}
 
 请基于以上数据生成性能分析JSON报告，summary需包含性能状态、主要问题、影响和预期收益。`;
-
-  console.log("user prompt>>>", prompt);
-  console.log("user prompt end");
 
   try {
     const content = await callDeepSeekApi(prompt);
