@@ -47,44 +47,44 @@ const SYSTEM_PROMPT = `
   "problems": [
     {
       "type": "script|image|network|render|third-party|other",
-      "title": "具体问题标题",
+      "title": "具体问题标题（必须填充，不能为空字符串）",
       "severity": "high|medium|low",
-      "impact": "具体影响说明",
-      "suggestion": "概括性优化方向"
+      "impact": "具体影响说明（必须填充）",
+      "suggestion": "概括性优化方向（必须填充）"
     }
-    // 至少 3-5 个问题
+    // 必须至少 3-5 个问题，每个问题的所有字段都必须填充，不能有任何空字段或注释字段
   ],
   "ai_insights": {
-    "main_bottleneck": "一句话主要瓶颈",
-    "root_causes": ["根因1","根因2","根因3"],
-    "quick_wins": ["立即可做1","立即可做2","立即可做3"]
+    "main_bottleneck": "一句话主要瓶颈（必须填充，不能为空或占位符）",
+    "root_causes": ["根因1","根因2","根因3"], // 必须至少3个，不能为空数组
+    "quick_wins": ["立即可做1","立即可做2","立即可做3"] // 必须至少3个，不能为空数组
   },
   "suggestions": [
     {
-      "title": "建议标题",
-      "desc": "详细说明（问题分析、优化原理、实施步骤、注意事项）",
+      "title": "建议标题（必须填充）",
+      "desc": "详细说明（问题分析、优化原理、实施步骤、注意事项，必须填充）",
       "category": "前端|网络|构建优化|图片|交互体验",
-      "code": "完整可执行代码（至少 20 行，含文件说明与注释）",
-      "benefit": "预计收益（量化说明，如 LCP 降低 X%，缩短 Y 秒）"
+      "code": "完整可执行代码（至少 20 行，含文件说明与注释，必须填充）",
+      "benefit": "预计收益（量化说明，如 LCP 降低 X%，缩短 Y 秒，必须填充）"
     }
-    // 必须至少 5 项（建议 5-10 项），覆盖不同类别
+    // 必须至少 5 项（建议 5-10 项），覆盖不同类别，不能为空数组
   ],
   "code_examples": [
     {
-      "type": "示例类型标识（如 lazy-load）",
-      "desc": "短说明",
-      "code": "完整或精简可执行代码（含注释与文件结构说明）"
+      "type": "示例类型标识（如 lazy-load，必须填充）",
+      "desc": "短说明（必须填充）",
+      "code": "完整或精简可执行代码（含注释与文件结构说明，必须填充）"
     }
-    // 至少 5 个示例，建议 10-15 个，覆盖 Vue/React/Vite/webpack/Sharp/imagemin/Express/Nginx/ServiceWorker/虚拟滚动/预加载等
+    // 必须至少 5 个示例，建议 10-15 个，覆盖 Vue/React/Vite/webpack/Sharp/imagemin/Express/Nginx/ServiceWorker/虚拟滚动/预加载等，不能为空数组
   ],
   "visualization": {
     "chartData": {
-      "metricTrends": [{"metric":"LCP","before":数字,"after":数字}, ...],
-      "bottleneckDistribution":{"script":数字,"image":数字,"network":数字,"render":数字,"third-party":数字}
+      "metricTrends": [{"metric":"LCP","before":数字,"after":数字}, ...], // 必须至少包含LCP、TBT等关键指标的before/after数据，不能为空数组
+      "bottleneckDistribution":{"script":数字,"image":数字,"network":数字,"render":数字,"third-party":数字} // 所有键必须填充数字，不能为空对象
     },
     "aiCards": [
-      {"title":"卡片标题","impact":"影响描述","suggestion":"建议","confidence":"高|中|低"}
-      // 至少 3 个卡片
+      {"title":"卡片标题（必须填充）","impact":"影响描述（必须填充）","suggestion":"建议（必须填充）","confidence":"高|中|低"}
+      // 必须至少 3 个卡片，不能为空数组
     ]
   },
   "prediction": "量化预测（如：性能评分提升 X-Y%，首屏时间缩短 Z 秒）"
@@ -114,19 +114,39 @@ const SYSTEM_PROMPT = `
 - 纯 JSON（可被 JSON.parse() 解析）
 - 所有文本字段使用纯文本格式，不要使用任何 Markdown 语法（如 **加粗**、# 标题、- 列表等）
 - 不包含三反引号等代码块标记
-- 所有字段均需填充，不能留空
+- **所有字段均需填充，不能留空，不能为空字符串，不能为空数组，不能为空对象**
 - 所有字符串值必须用双引号包裹（如 "suggestion": "优化建议" 而不是 "suggestion": 优化建议"）
-- 不要生成任何占位符字段或注释字段（如 _insights_、_placeholder_ 等）
-- suggestions 数组必须至少包含 5 个优化建议，每个建议包含完整的代码示例（至少 20 行）
-- code_examples 数组必须至少包含 5 个代码示例，建议包含 10-15 个不同类型示例
+- **绝对禁止生成任何占位符字段、注释字段或说明性字段（如 __comment1__、_placeholder_、_insights_ 等）**
+- **problems 数组中的每个对象的所有字段都必须填充，如果某个问题类型不明确，请基于 Lighthouse 数据合理推断并填充**
+- **ai_insights 的 main_bottleneck 必须基于实际数据分析得出，不能是"需要进一步分析"等占位符；root_causes 和 quick_wins 必须至少各3个，不能为空数组**
+- **suggestions 数组必须至少包含 5 个优化建议，每个建议的所有字段都必须填充，不能为空数组**
+- **code_examples 数组必须至少包含 5 个代码示例，建议包含 10-15 个不同类型示例，不能为空数组**
+- **visualization.chartData.metricTrends 必须至少包含 LCP、TBT 等关键指标的 before/after 数据，不能为空数组**
+- **visualization.chartData.bottleneckDistribution 的所有键都必须填充数字（基于 problems 数组分析），不能为空对象**
+- **visualization.aiCards 必须至少包含 3 个卡片，每个卡片的所有字段都必须填充，不能为空数组**
 - 根据上述性能数据，生成有针对性的、可直接使用的代码示例
+
+字段填充要求（严格执行，违反将导致错误）：
+1. problems[]: 每个对象的 title、impact、suggestion 都不能为空字符串
+2. ai_insights.main_bottleneck: 必须是一个具体的瓶颈描述，不能是占位符
+3. ai_insights.root_causes: 数组长度至少3，每个元素都不能为空
+4. ai_insights.quick_wins: 数组长度至少3，每个元素都不能为空
+5. suggestions: 数组长度至少5，每个对象的 title、desc、code、benefit 都不能为空
+6. code_examples: 数组长度至少5，每个对象的 type、desc、code 都不能为空
+7. visualization.chartData.metricTrends: 数组长度至少2，包含关键指标数据
+8. visualization.chartData.bottleneckDistribution: 对象必须包含所有5个键（script、image、network、render、third-party），每个键的值都是数字
+9. visualization.aiCards: 数组长度至少3，每个对象的 title、impact、suggestion 都不能为空
 
 JSON 格式检查清单（生成前请确认）：
 ✓ 所有字符串值都用双引号包裹
 ✓ 没有缺失的引号
-✓ 没有占位符字段
+✓ 没有占位符字段、注释字段或说明性字段
 ✓ 没有 Markdown 语法
-✓ 所有字段都已填充实际内容
+✓ 所有字段都已填充实际内容（没有空字符串、空数组、空对象）
+✓ problems 数组中没有不完整的对象
+✓ ai_insights 的所有字段都已填充
+✓ suggestions 和 code_examples 数组不为空
+✓ visualization 的所有字段都已填充
 ✓ JSON 可以被 JSON.parse() 正常解析
 
 现在请依据提供的 Lighthouse 数据生成完整报告并返回上述 JSON。`;
@@ -546,21 +566,24 @@ ${Object.values(lighthouseResult.audits)
         }
       );
 
-      // 3. 移除占位符字段（包含_insights_、_placeholder_、_comment_等占位符的字段）
+      // 3. 移除占位符字段和注释字段（包含_insights_、_placeholder_、_comment_、__comment__等）
       // 先移除字段定义（包括前面的逗号）
       jsonContent = jsonContent.replace(
-        /,\s*"[^"]*_(?:insights_|placeholder_|comment_)[^"]*"\s*:[^,}]*/gi,
+        /,\s*"[^"]*_(?:insights_|placeholder_|comment_|_comment_)[^"]*"\s*:[^,}]*/gi,
         ""
       );
       // 再移除字段定义（包括后面的逗号）
       jsonContent = jsonContent.replace(
-        /"[^"]*_(?:insights_|placeholder_|comment_)[^"]*"\s*:[^,}]*,?/gi,
+        /"[^"]*_(?:insights_|placeholder_|comment_|_comment_)[^"]*"\s*:[^,}]*,?/gi,
         ""
       );
+      // 移除以双下划线开头的注释字段（如 __comment1__）
+      jsonContent = jsonContent.replace(/,\s*"__[^"]*__"\s*:[^,}]*/gi, "");
+      jsonContent = jsonContent.replace(/"__[^"]*__"\s*:[^,}]*,?/gi, "");
       // 移除包含大量下划线和占位符文本的字段
       jsonContent = jsonContent.replace(/,\s*"[^"]*_{3,}[^"]*"\s*:[^,}]*/g, "");
 
-      // 3. 清理多余的逗号
+      // 4. 清理多余的逗号
       jsonContent = jsonContent
         .replace(/,(\s*[}\]])/g, "$1") // 移除末尾逗号
         .replace(/,(\s*,)/g, ",") // 移除重复逗号
