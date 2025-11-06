@@ -3,21 +3,9 @@ import fetch from "node-fetch";
 // DeepSeek API 配置
 const DEEPSEEK_API_KEY =
   process.env.DEEPSEEK_API_KEY || "sk-9652bb96f61245ba899e23e5f67583fe";
-const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL || "deepseek-chat";
+const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL || "deepseek-reasoner";
 const DEEPSEEK_API_URL = "https://api.deepseek.com/chat/completions";
 
-/**
- * 增强版 AI 性能分析系统提示词
- *
- * 目标：生成结构化、全面的性能分析报告，包含：
- * - 性能概述与核心指标分析
- * - 问题分类与严重度评估
- * - AI 智能洞察（瓶颈、根因、Quick Wins）
- * - 详细优化建议与代码示例
- * - 多类型代码示例（懒加载、打包、图片、压缩、CDN）
- * - 可视化数据（趋势、瓶颈分布、AI 卡片）
- * - 性能预测
- */
 const SYSTEM_PROMPT = `你是网页性能优化专家。根据Lighthouse数据返回纯JSON格式的性能分析报告。
 
 要求：
@@ -70,11 +58,6 @@ JSON结构：
 
 关键：确保JSON完整且可解析，所有字段有值，problems中每个对象必须完整。`;
 
-/**
- * 调用 DeepSeek API 接口，传入用户输入，返回模型结果
- * @param {string} userContent - 用户输入内容
- * @returns {Promise<string>} - 模型返回的内容
- */
 async function callDeepSeekApi(userContent) {
   if (!DEEPSEEK_API_KEY) {
     throw new Error(
@@ -100,7 +83,7 @@ async function callDeepSeekApi(userContent) {
         },
       ],
       temperature: 0.3, // 降低随机性，提高一致性
-      max_tokens: 8192, // 增加token限制，确保完整输出
+      max_tokens: 20000, // 增加token限制，确保完整输出
       top_p: 0.9,
       frequency_penalty: 0.1, // 降低重复惩罚
       presence_penalty: 0,
@@ -141,10 +124,9 @@ async function callDeepSeekApi(userContent) {
     if (data.choices && data.choices.length > 0) {
       const choice = data.choices[0];
       if (choice.message && choice.message.content) {
-        console.log(
-          "🐶🐶🐶choice.message.content>>>",
-          choice.message.content.trim()
-        );
+        console.log("🐶🐶🐶choice.message.content start>>>");
+        console.log(choice.message.content.trim());
+        console.log("🐶🐶🐶choice.message.content end");
         return choice.message.content.trim();
       }
     }
@@ -226,82 +208,6 @@ ${Object.values(lighthouseResult.audits)
   console.log("user prompt>>>", prompt);
   console.log("user prompt end");
 
-  // JSON 清理和修复函数
-  function cleanJsonString(jsonString) {
-    let cleaned = jsonString.trim();
-
-    // 移除 Markdown 代码块标记（```json、```JSON、```）
-    cleaned = cleaned
-      .replace(/^```(?:json|JSON)?\s*\n?/i, "") // 移除开头的 ```json 或 ```
-      .replace(/\n?```\s*$/i, "") // 移除结尾的 ```
-      .trim();
-
-    // 如果还有代码块标记（可能在中间），尝试移除
-    if (cleaned.includes("```")) {
-      // 只移除独立的代码块标记行（整行只有 ``` 或 ```json）
-      cleaned = cleaned
-        .split("\n")
-        .filter((line) => !/^```(?:json|JSON)?\s*$/i.test(line.trim()))
-        .join("\n");
-    }
-
-    // 移除 JSON 注释（单行和多行）
-    cleaned = cleaned
-      .replace(/\/\/.*$/gm, "") // 移除单行注释
-      .replace(/\/\*[\s\S]*?\*\//g, ""); // 移除多行注释
-
-    // 尝试提取第一个完整的 JSON 对象
-    const firstBrace = cleaned.indexOf("{");
-    if (firstBrace !== -1) {
-      let braceCount = 0;
-      let inString = false;
-      let escapeNext = false;
-      let endIndex = firstBrace;
-
-      for (let i = firstBrace; i < cleaned.length; i++) {
-        const char = cleaned[i];
-
-        if (escapeNext) {
-          escapeNext = false;
-          continue;
-        }
-
-        if (char === "\\") {
-          escapeNext = true;
-          continue;
-        }
-
-        if (char === '"') {
-          inString = !inString;
-          continue;
-        }
-
-        if (!inString) {
-          if (char === "{") {
-            braceCount++;
-          } else if (char === "}") {
-            braceCount--;
-            if (braceCount === 0) {
-              endIndex = i + 1;
-              break;
-            }
-          }
-        }
-      }
-
-      if (braceCount === 0) {
-        cleaned = cleaned.substring(firstBrace, endIndex);
-      }
-    }
-
-    // 移除末尾多余的逗号（在对象和数组的最后一个元素后）
-    cleaned = cleaned
-      .replace(/,(\s*[}\]])/g, "$1") // 移除对象和数组末尾的逗号
-      .trim();
-
-    return cleaned;
-  }
-
   try {
     const content = await callDeepSeekApi(prompt);
 
@@ -309,221 +215,11 @@ ${Object.values(lighthouseResult.audits)
       throw new Error("No response from DeepSeek API");
     }
 
-    // 清理和修复 JSON 字符串
-    let jsonContent = cleanJsonString(content);
-
-    // 尝试解析 JSON，如果失败则尝试更激进的修复
     let analysis;
     try {
-      analysis = JSON.parse(jsonContent);
+      analysis = JSON.parse(content);
     } catch (parseError) {
-      console.error("First JSON parse attempt failed:", parseError.message);
-
-      // 显示错误位置附近的内容以便调试
-      if (parseError.message.includes("position")) {
-        const match = parseError.message.match(/position (\d+)/);
-        if (match) {
-          const pos = parseInt(match[1]);
-          const start = Math.max(0, pos - 100);
-          const end = Math.min(jsonContent.length, pos + 100);
-          console.error(
-            `Error at position ${pos}, context:`,
-            jsonContent.substring(start, end)
-          );
-        }
-      }
-
-      // 尝试更激进的修复：移除 Markdown 代码块标记和所有注释行
-      jsonContent = jsonContent
-        .replace(/^```(?:json|JSON)?\s*\n?/i, "") // 移除开头的 ```json 或 ```
-        .replace(/\n?```\s*$/i, "") // 移除结尾的 ```
-        .trim();
-
-      // 移除所有注释行和多余的空行
-      jsonContent = jsonContent
-        .split("\n")
-        .filter((line) => {
-          const trimmed = line.trim();
-          return (
-            trimmed &&
-            !trimmed.startsWith("//") &&
-            !trimmed.startsWith("/*") &&
-            !trimmed.startsWith("*") &&
-            !trimmed.startsWith("```") // 也移除可能的代码块标记行
-          );
-        })
-        .join("\n");
-
-      // 尝试修复常见的 JSON 问题
-      // 1. 尝试提取完整的 JSON 对象（如果响应被截断）
-      // 通过找到最后一个匹配的 } 来提取完整的 JSON
-      try {
-        let braceCount = 0;
-        let inString = false;
-        let escapeNext = false;
-        let lastValidBrace = -1;
-
-        for (let i = 0; i < jsonContent.length; i++) {
-          const char = jsonContent[i];
-
-          if (escapeNext) {
-            escapeNext = false;
-            continue;
-          }
-
-          if (char === "\\") {
-            escapeNext = true;
-            continue;
-          }
-
-          if (char === '"') {
-            inString = !inString;
-            continue;
-          }
-
-          if (!inString) {
-            if (char === "{") {
-              braceCount++;
-            } else if (char === "}") {
-              braceCount--;
-              if (braceCount === 0) {
-                lastValidBrace = i;
-              }
-            }
-          }
-        }
-
-        // 如果找到了完整的 JSON 对象，且 JSON 可能被截断
-        if (lastValidBrace !== -1 && lastValidBrace < jsonContent.length - 10) {
-          const potentialJson = jsonContent.substring(0, lastValidBrace + 1);
-          try {
-            const testParse = JSON.parse(potentialJson);
-            jsonContent = potentialJson;
-            console.log("Successfully extracted complete JSON from response");
-          } catch (e) {
-            // 如果截断后的 JSON 仍然无效，继续使用原始内容
-          }
-        }
-      } catch (e) {
-        // 如果提取失败，继续尝试其他修复
-      }
-
-      // 尝试修复常见的 JSON 语法错误
-      // 1. 先修复不完整的对象（移除空字段或缺失键名的字段）
-      // 移除类似 "title": "", "", "" 这样的无效字段（没有键名的空字符串）
-      jsonContent = jsonContent.replace(/,\s*"",\s*""/g, "");
-      jsonContent = jsonContent.replace(/,\s*""/g, "");
-      jsonContent = jsonContent.replace(/""\s*,/g, "");
-
-      // 移除不完整的对象（只有空字段或缺失键名的对象）
-      // 匹配类似 {"type": "render", "title": "", "", "", ""} 的情况
-      jsonContent = jsonContent.replace(
-        /,\s*\{\s*"type"\s*:\s*"[^"]*"\s*,\s*"title"\s*:\s*"",\s*"",\s*"",\s*""\s*\}/g,
-        ""
-      );
-      jsonContent = jsonContent.replace(
-        /\{\s*"type"\s*:\s*"[^"]*"\s*,\s*"title"\s*:\s*"",\s*"",\s*"",\s*""\s*\}/g,
-        ""
-      );
-
-      // 移除只包含空字段的对象（更通用的情况）
-      jsonContent = jsonContent.replace(
-        /,\s*\{\s*"[^"]*"\s*:\s*"[^"]*"\s*,\s*"[^"]*"\s*:\s*"",\s*"",\s*"",\s*""\s*\}/g,
-        ""
-      );
-      jsonContent = jsonContent.replace(
-        /\{\s*"[^"]*"\s*:\s*"[^"]*"\s*,\s*"[^"]*"\s*:\s*"",\s*"",\s*"",\s*""\s*\}/g,
-        ""
-      );
-
-      // 2. 修复缺失开头引号的字符串值（更精确的匹配）
-      // 只匹配明显的缺失引号情况：": 后面直接跟着字母或中文字符（非引号、非数字、非布尔值）
-      // 使用更保守的正则，只匹配明显的字符串值（以字母、中文、常见符号开头）
-      jsonContent = jsonContent.replace(
-        /":\s*([a-zA-Z\u4e00-\u9fa5][^"]*?)"/g,
-        (match, value) => {
-          const trimmed = value.trim();
-          // 再次检查确保不是数字、布尔值、null或数组/对象
-          if (
-            trimmed.length > 0 &&
-            !trimmed.startsWith('"') &&
-            !trimmed.startsWith("[") &&
-            !trimmed.startsWith("{") &&
-            !/^(true|false|null|-?\d+\.?\d*)$/.test(trimmed)
-          ) {
-            // 转义值中的特殊字符
-            const escaped = trimmed
-              .replace(/\\/g, "\\\\")
-              .replace(/"/g, '\\"')
-              .replace(/\n/g, "\\n")
-              .replace(/\r/g, "\\r")
-              .replace(/\t/g, "\\t");
-            return `": "${escaped}"`;
-          }
-          return match;
-        }
-      );
-
-      // 3. 移除占位符字段和注释字段（包含_insights_、_placeholder_、_comment_、__comment__等）
-      // 先移除字段定义（包括前面的逗号）
-      jsonContent = jsonContent.replace(
-        /,\s*"[^"]*_(?:insights_|placeholder_|comment_|_comment_)[^"]*"\s*:[^,}]*/gi,
-        ""
-      );
-      // 再移除字段定义（包括后面的逗号）
-      jsonContent = jsonContent.replace(
-        /"[^"]*_(?:insights_|placeholder_|comment_|_comment_)[^"]*"\s*:[^,}]*,?/gi,
-        ""
-      );
-      // 移除以双下划线开头的注释字段（如 __comment1__）
-      jsonContent = jsonContent.replace(/,\s*"__[^"]*__"\s*:[^,}]*/gi, "");
-      jsonContent = jsonContent.replace(/"__[^"]*__"\s*:[^,}]*,?/gi, "");
-      // 移除包含大量下划线和占位符文本的字段
-      jsonContent = jsonContent.replace(/,\s*"[^"]*_{3,}[^"]*"\s*:[^,}]*/g, "");
-
-      // 4. 清理多余的逗号
-      jsonContent = jsonContent
-        .replace(/,(\s*[}\]])/g, "$1") // 移除末尾逗号
-        .replace(/,(\s*,)/g, ",") // 移除重复逗号
-        .trim();
-
-      try {
-        analysis = JSON.parse(jsonContent);
-      } catch (secondError) {
-        console.error("Second JSON parse attempt failed:", secondError.message);
-
-        // 显示更详细的错误信息
-        if (secondError.message.includes("position")) {
-          const match = secondError.message.match(/position (\d+)/);
-          if (match) {
-            const pos = parseInt(match[1]);
-            const start = Math.max(0, pos - 100);
-            const end = Math.min(jsonContent.length, pos + 100);
-            console.error(
-              `Error at position ${pos}, context:`,
-              jsonContent.substring(start, end)
-            );
-            console.error(
-              `JSON length: ${jsonContent.length}, error position: ${pos}`
-            );
-          }
-        }
-
-        console.error(
-          "JSON content (first 1000 chars):",
-          jsonContent.substring(0, 1000)
-        );
-        console.error(
-          "JSON content (last 500 chars):",
-          jsonContent.substring(Math.max(0, jsonContent.length - 500))
-        );
-
-        throw new Error(
-          `无法解析 AI 返回的 JSON 格式: ${
-            secondError.message
-          }。原始内容前500字符: ${content.substring(0, 500)}`
-        );
-      }
+      console.error("JSON parse attempt failed:", parseError.message);
     }
 
     // 确保所有必需字段都存在，如果缺失则使用默认值
