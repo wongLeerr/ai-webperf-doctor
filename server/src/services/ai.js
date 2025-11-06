@@ -18,138 +18,57 @@ const DEEPSEEK_API_URL = "https://api.deepseek.com/chat/completions";
  * - 可视化数据（趋势、瓶颈分布、AI 卡片）
  * - 性能预测
  */
-const SYSTEM_PROMPT = `
-你是一位资深网页性能优化专家（10年以上经验）。任务：根据提供的 Lighthouse 数据，返回一份结构化、专业且可落地的性能优化报告（纯 JSON），供前端直接渲染与使用。
+const SYSTEM_PROMPT = `你是网页性能优化专家。根据Lighthouse数据返回纯JSON格式的性能分析报告。
 
-必须遵守的硬性要求：
-1. 返回**纯 JSON**（可被 JSON.parse 正常解析）。所有文本字段使用纯文本格式，不要使用任何 Markdown 语法。
-2. 保持下述 JSON 结构与字段完整且不变，所有字段必须填充（不得留空或使用占位符）。
-3. 所有建议必须具体可执行，且包含完整代码示例（详见对 code 要求）。
+要求：
+1. 返回纯JSON，可被JSON.parse解析，无Markdown语法、无代码块标记
+2. 所有字段必须填充，不能为空字符串、空数组、空对象
+3. 所有字符串用双引号包裹
 
-输出 JSON 必须包含以下字段（严格遵循类型与含义）：
-
+JSON结构：
 {
-  "summary": "性能概述（纯文本格式，≥80 字，包含：性能状态、至少 3-5 个主要问题、对用户体验影响、修复后预期收益。使用换行符 \\n 分隔段落）",
-  "score": {
-    "performance": 0-100,
-    "accessibility": 0-100,
-    "bestPractices": 0-100,
-    "seo": 0-100
-  },
+  "summary": "性能概述（80-150字，用\\n分隔段落）",
+  "score": {"performance": 0-100, "accessibility": 0-100, "bestPractices": 0-100, "seo": 0-100},
   "metrics": {
-    "LCP": "值 + 说明",
-    "FID": "值 + 说明",
-    "CLS": "值 + 说明",
-    "TBT": "值 + 说明",
-    "FCP": "值 + 说明",
-    "SpeedIndex": "值 + 说明"
+    "LCP": "值ms - 说明",
+    "FID": "值ms - 说明",
+    "CLS": "值 - 说明",
+    "TBT": "值ms - 说明",
+    "FCP": "值ms - 说明",
+    "SpeedIndex": "值 - 说明"
   },
   "problems": [
-    {
-      "type": "script|image|network|render|third-party|other",
-      "title": "具体问题标题（必须填充，不能为空字符串）",
-      "severity": "high|medium|low",
-      "impact": "具体影响说明（必须填充）",
-      "suggestion": "概括性优化方向（必须填充）"
-    }
-    // 必须至少 3-5 个问题，每个问题的所有字段都必须填充，不能有任何空字段或注释字段
+    {"type": "script|image|network|render|third-party", "title": "问题标题", "severity": "high|medium|low", "impact": "影响说明", "suggestion": "优化方向"}
   ],
   "ai_insights": {
-    "main_bottleneck": "一句话主要瓶颈（必须填充，不能为空或占位符）",
-    "root_causes": ["根因1","根因2","根因3"], // 必须至少3个，不能为空数组
-    "quick_wins": ["立即可做1","立即可做2","立即可做3"] // 必须至少3个，不能为空数组
+    "main_bottleneck": "主要瓶颈描述",
+    "root_causes": ["根因1", "根因2", "根因3"],
+    "quick_wins": ["快速优化1", "快速优化2", "快速优化3"]
   },
   "suggestions": [
-    {
-      "title": "建议标题（必须填充）",
-      "desc": "详细说明（问题分析、优化原理、实施步骤、注意事项，必须填充）",
-      "category": "前端|网络|构建优化|图片|交互体验",
-      "code": "完整可执行代码（至少 20 行，含文件说明与注释，必须填充）",
-      "benefit": "预计收益（量化说明，如 LCP 降低 X%，缩短 Y 秒，必须填充）"
-    }
-    // 必须至少 5 项（建议 5-10 项），覆盖不同类别，不能为空数组
+    {"title": "优化建议", "desc": "详细说明", "category": "前端|网络|构建|图片|交互", "code": "可执行代码（15-25行含注释）", "benefit": "预期收益"}
   ],
   "code_examples": [
-    {
-      "type": "示例类型标识（如 lazy-load，必须填充）",
-      "desc": "短说明（必须填充）",
-      "code": "完整或精简可执行代码（含注释与文件结构说明，必须填充）"
-    }
-    // 必须至少 5 个示例，建议 10-15 个，覆盖 Vue/React/Vite/webpack/Sharp/imagemin/Express/Nginx/ServiceWorker/虚拟滚动/预加载等，不能为空数组
+    {"type": "示例类型", "desc": "说明", "code": "可执行代码"}
   ],
   "visualization": {
     "chartData": {
-      "metricTrends": [{"metric":"LCP","before":数字,"after":数字}, ...], // 必须至少包含LCP、TBT等关键指标的before/after数据，不能为空数组
-      "bottleneckDistribution":{"script":数字,"image":数字,"network":数字,"render":数字,"third-party":数字} // 所有键必须填充数字，不能为空对象
+      "metricTrends": [{"metric": "LCP", "before": 数字, "after": 数字}],
+      "bottleneckDistribution": {"script": 数字, "image": 数字, "network": 数字, "render": 数字, "third-party": 数字}
     },
-    "aiCards": [
-      {"title":"卡片标题（必须填充）","impact":"影响描述（必须填充）","suggestion":"建议（必须填充）","confidence":"高|中|低"}
-      // 必须至少 3 个卡片，不能为空数组
-    ]
+    "aiCards": [{"title": "标题", "impact": "影响", "suggestion": "建议", "confidence": "高|中|低"}]
   },
-  "prediction": "量化预测（如：性能评分提升 X-Y%，首屏时间缩短 Z 秒）"
+  "prediction": "性能提升预测"
 }
 
-代码示例（code 字段与 code_examples 内的每个示例）必须满足：
-- 每个 suggestions[i].code 至少 20 行、完整可执行（包含必要的导入/导出或配置段），并包含：
-  1. 文件或文件结构说明（如：文件名和目录）
-  2. 完整代码（可直接复制运行或放入项目）
-  3. 行内注释解释每段逻辑
-  4. 说明该代码解决的性能点与注意事项
-- code_examples 数组的示例可略短于 suggestions 中的示例，但仍需可执行并包含注释。
-- 示例应与检测到的问题相关联（优先生成针对性强的示例）。
+数量要求：
+- problems: 3-5个（所有字段必须填充）
+- suggestions: 5个（每个code 15-25行）
+- code_examples: 5个
+- metricTrends: 至少LCP和TBT
+- aiCards: 3个
 
-分析要点（简明）：
-- 深度解析 LCP、FID、CLS、TBT、FCP、Speed Index 等；
-- 评估资源体积、请求数、第三方影响、主线程耗时分布；
-- 智能推断根因（例如：TBT 高 + JS 大 → 脚本阻塞；LCP 高 + 大图片 → 图片传输慢）；
-- 给出可量化的收益预测。
-
-优先级规则（防止超时）：
-1. 优先完整生成 suggestions 中 前 5 项，保证每项包含 ≥20 行完整代码与详细说明。  
-2. 若剩余 token/时间不足，仍必须返回完整 JSON 结构：对 code_examples 中的剩余示例可给出较短但可执行版本（仍含注释），并保证 code_examples 的总数不少于 5。  
-3. 在任何情况下都不得返回无效 JSON、不得省略必须字段或用占位符替代内容。
-
-重要的事再强调一次：
-- 纯 JSON（可被 JSON.parse() 解析）
-- 所有文本字段使用纯文本格式，不要使用任何 Markdown 语法（如 **加粗**、# 标题、- 列表等）
-- 不包含三反引号等代码块标记
-- **所有字段均需填充，不能留空，不能为空字符串，不能为空数组，不能为空对象**
-- 所有字符串值必须用双引号包裹（如 "suggestion": "优化建议" 而不是 "suggestion": 优化建议"）
-- **绝对禁止生成任何占位符字段、注释字段或说明性字段（如 __comment1__、_placeholder_、_insights_ 等）**
-- **problems 数组中的每个对象的所有字段都必须填充，如果某个问题类型不明确，请基于 Lighthouse 数据合理推断并填充**
-- **ai_insights 的 main_bottleneck 必须基于实际数据分析得出，不能是"需要进一步分析"等占位符；root_causes 和 quick_wins 必须至少各3个，不能为空数组**
-- **suggestions 数组必须至少包含 5 个优化建议，每个建议的所有字段都必须填充，不能为空数组**
-- **code_examples 数组必须至少包含 5 个代码示例，建议包含 10-15 个不同类型示例，不能为空数组**
-- **visualization.chartData.metricTrends 必须至少包含 LCP、TBT 等关键指标的 before/after 数据，不能为空数组**
-- **visualization.chartData.bottleneckDistribution 的所有键都必须填充数字（基于 problems 数组分析），不能为空对象**
-- **visualization.aiCards 必须至少包含 3 个卡片，每个卡片的所有字段都必须填充，不能为空数组**
-- 根据上述性能数据，生成有针对性的、可直接使用的代码示例
-
-字段填充要求（严格执行，违反将导致错误）：
-1. problems[]: 每个对象的 title、impact、suggestion 都不能为空字符串
-2. ai_insights.main_bottleneck: 必须是一个具体的瓶颈描述，不能是占位符
-3. ai_insights.root_causes: 数组长度至少3，每个元素都不能为空
-4. ai_insights.quick_wins: 数组长度至少3，每个元素都不能为空
-5. suggestions: 数组长度至少5，每个对象的 title、desc、code、benefit 都不能为空
-6. code_examples: 数组长度至少5，每个对象的 type、desc、code 都不能为空
-7. visualization.chartData.metricTrends: 数组长度至少2，包含关键指标数据
-8. visualization.chartData.bottleneckDistribution: 对象必须包含所有5个键（script、image、network、render、third-party），每个键的值都是数字
-9. visualization.aiCards: 数组长度至少3，每个对象的 title、impact、suggestion 都不能为空
-
-JSON 格式检查清单（生成前请确认）：
-✓ 所有字符串值都用双引号包裹
-✓ 没有缺失的引号
-✓ 没有占位符字段、注释字段或说明性字段
-✓ 没有 Markdown 语法
-✓ 所有字段都已填充实际内容（没有空字符串、空数组、空对象）
-✓ problems 数组中没有不完整的对象
-✓ ai_insights 的所有字段都已填充
-✓ suggestions 和 code_examples 数组不为空
-✓ visualization 的所有字段都已填充
-✓ JSON 可以被 JSON.parse() 正常解析
-
-现在请依据提供的 Lighthouse 数据生成完整报告并返回上述 JSON。`;
+关键：确保JSON完整且可解析，所有字段有值，problems中每个对象必须完整。`;
 
 /**
  * 调用 DeepSeek API 接口，传入用户输入，返回模型结果
@@ -180,13 +99,15 @@ async function callDeepSeekApi(userContent) {
           content: userContent,
         },
       ],
-      temperature: 0.7,
-      max_tokens: 8000,
-      top_p: 1.0,
-      frequency_penalty: 0.3,
-      presence_penalty: 0.0,
+      temperature: 0.3, // 降低随机性，提高一致性
+      max_tokens: 8192, // 增加token限制，确保完整输出
+      top_p: 0.9,
+      frequency_penalty: 0.1, // 降低重复惩罚
+      presence_penalty: 0,
       stream: false,
     };
+
+    console.log("payload>>>", JSON.stringify(payload, null, 2));
 
     const response = await fetch(DEEPSEEK_API_URL, {
       method: "POST",
@@ -257,76 +178,53 @@ async function callDeepSeekApi(userContent) {
 }
 
 export async function analyzeWithAI(lighthouseResult) {
-  const prompt = `请分析以下 Lighthouse 性能数据：
+  const prompt = `分析以下 Lighthouse 性能数据，返回JSON格式报告：
 
 网址: ${lighthouseResult.url}
 性能评分: ${lighthouseResult.score}/100
 
 关键指标:
-- LCP (最大内容绘制): ${lighthouseResult.metrics.lcp?.toFixed(0) || "无数据"}ms
-- FID (首次输入延迟): ${lighthouseResult.metrics.fid?.toFixed(0) || "无数据"}ms
-- CLS (累积布局偏移): ${lighthouseResult.metrics.cls?.toFixed(3) || "无数据"}
-- FCP (首次内容绘制): ${lighthouseResult.metrics.fcp?.toFixed(0) || "无数据"}ms
-- TBT (总阻塞时间): ${lighthouseResult.metrics.tbt?.toFixed(0) || "无数据"}ms
-- Speed Index (速度指数): ${
-    lighthouseResult.metrics.speedIndex?.toFixed(0) || "无数据"
-  }
+LCP: ${lighthouseResult.metrics.lcp?.toFixed(0) || 0}ms
+FID: ${lighthouseResult.metrics.fid?.toFixed(0) || 0}ms
+CLS: ${lighthouseResult.metrics.cls?.toFixed(3) || 0}
+FCP: ${lighthouseResult.metrics.fcp?.toFixed(0) || 0}ms
+TBT: ${lighthouseResult.metrics.tbt?.toFixed(0) || 0}ms
+SpeedIndex: ${lighthouseResult.metrics.speedIndex?.toFixed(0) || 0}
 
-资源体积分析:
-- JS 总大小: ${lighthouseResult.resources?.jsTotalSize || 0} KB
-- CSS 总大小: ${lighthouseResult.resources?.cssTotalSize || 0} KB
-- 图片总大小: ${lighthouseResult.resources?.imageTotalSize || 0} KB
-- 第三方资源: ${lighthouseResult.resources?.thirdPartySize || 0} KB
-- 总资源大小: ${lighthouseResult.resources?.totalSize || 0} KB
+资源体积:
+JS: ${lighthouseResult.resources?.jsTotalSize || 0}KB
+CSS: ${lighthouseResult.resources?.cssTotalSize || 0}KB
+图片: ${lighthouseResult.resources?.imageTotalSize || 0}KB
+第三方: ${lighthouseResult.resources?.thirdPartySize || 0}KB
+总计: ${lighthouseResult.resources?.totalSize || 0}KB
 
-请求统计:
-- 总请求数: ${lighthouseResult.requests?.total || 0}
-- 第三方请求: ${lighthouseResult.requests?.thirdParty || 0} (${
-    lighthouseResult.requests?.thirdPartyRatio || 0
-  }%)
+请求: 总计${lighthouseResult.requests?.total || 0}个，第三方${
+    lighthouseResult.requests?.thirdParty || 0
+  }个
 
-主线程分析:
-- 脚本执行: ${lighthouseResult.mainThread?.scriptEvaluation?.toFixed(0) || 0}ms
-- 布局计算: ${lighthouseResult.mainThread?.layout?.toFixed(0) || 0}ms
-- 绘制时间: ${lighthouseResult.mainThread?.paint?.toFixed(0) || 0}ms
-- 样式计算: ${lighthouseResult.mainThread?.style?.toFixed(0) || 0}ms
+主线程: 脚本${
+    lighthouseResult.mainThread?.scriptEvaluation?.toFixed(0) || 0
+  }ms, 布局${lighthouseResult.mainThread?.layout?.toFixed(0) || 0}ms, 绘制${
+    lighthouseResult.mainThread?.paint?.toFixed(0) || 0
+  }ms
 
-慢请求 Top 5:
+慢请求:
 ${(lighthouseResult.requests?.slowRequests || [])
   .slice(0, 5)
-  .map((req, idx) => `${idx + 1}. ${req.url} (${req.duration}ms, ${req.type})`)
+  .map((req, idx) => `${idx + 1}. ${req.url} (${req.duration}ms)`)
   .join("\n")}
 
-主要问题（来自审核）:
+主要问题:
 ${Object.values(lighthouseResult.audits)
   .filter((audit) => audit.score !== null && audit.score < 0.9)
-  .slice(0, 10)
-  .map(
-    (audit) =>
-      `- ${audit.title}: ${audit.displayValue || "失败"} (评分: ${audit.score})`
-  )
+  .slice(0, 8)
+  .map((audit) => `${audit.title}: ${audit.displayValue || "失败"}`)
   .join("\n")}
 
-请提供全面的分析，包括：
-1. **【最重要】系统性的性能分析报告（summary）**：
-   - **格式要求**：使用纯文本格式，使用换行符（\\n）分隔段落，不要使用任何 Markdown 语法
-   - **字数要求**：不少于 80 字，建议 100-200 字
-   - **必须包含以下四个部分**，每个部分都要详细说明：
-     * 性能状态概述：当前性能评分、整体性能状况（1-2句话，说明当前状态）
-     * 主要性能问题列表：至少列出 3-5 个具体问题，每个问题要具体明确，要基于上面的 Lighthouse 数据分析
-     * 对用户体验的影响：详细说明每个问题如何影响用户（如：加载时间延长、交互延迟、视觉体验差、首屏内容显示慢等）
-     * 修复后的预期收益：量化说明修复后的性能提升（如：LCP 可降低 30%，首屏时间减少 1.5 秒，TBT 降低 40%，性能评分提升至 85 分等）
-   - **内容要求**：系统、专业、可读性强，要基于上面提供的 Lighthouse 数据进行分析，不能泛泛而谈，每个问题都要有数据支撑
-2. 识别具体性能瓶颈（网络/渲染/JS膨胀/图片/第三方脚本等）
-3. 生成具体的优化建议和代码示例
-4. 预测优化后的性能评分
+请基于以上数据生成性能分析JSON报告，summary需包含性能状态、主要问题、影响和预期收益。`;
 
-【重要数量要求】：
-- suggestions 数组必须至少包含 5 个优化建议，每个建议包含完整的代码示例（至少 20 行）
-- code_examples 数组必须至少包含 5 个代码示例，建议包含 10-15 个不同类型示例
-- 根据上述性能数据，生成有针对性的、可直接使用的代码示例
-
-请仅以有效的 JSON 格式返回响应，所有文本内容必须使用中文。`;
+  console.log("user prompt>>>", prompt);
+  console.log("user prompt end");
 
   // JSON 清理和修复函数
   function cleanJsonString(jsonString) {
@@ -629,6 +527,25 @@ ${Object.values(lighthouseResult.audits)
     }
 
     // 确保所有必需字段都存在，如果缺失则使用默认值
+    // 清理 problems 数组，移除不完整的对象
+    let problems = analysis.problems || [];
+    if (Array.isArray(problems)) {
+      problems = problems.filter((problem) => {
+        return (
+          problem &&
+          typeof problem === "object" &&
+          problem.type &&
+          problem.title &&
+          problem.title.trim() !== "" &&
+          problem.severity &&
+          problem.impact &&
+          problem.impact.trim() !== "" &&
+          problem.suggestion &&
+          problem.suggestion.trim() !== ""
+        );
+      });
+    }
+
     analysis = {
       summary: analysis.summary || "性能分析完成",
       score: {
@@ -645,7 +562,7 @@ ${Object.values(lighthouseResult.audits)
         seo: analysis.score?.seo || lighthouseResult.scores?.seo || 0,
       },
       metrics: analysis.metrics || {},
-      problems: analysis.problems || [],
+      problems: problems,
       ai_insights: analysis.ai_insights || {
         main_bottleneck: "需要进一步分析",
         root_causes: [],
